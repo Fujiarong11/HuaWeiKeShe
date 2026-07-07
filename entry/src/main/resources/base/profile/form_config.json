@@ -1,0 +1,28 @@
+{
+  "forms": [
+    {
+      "name": "HotQuestionCard",
+      "displayName": "热门问题",
+      "description": "展示校园问答平台热门问题",
+      "src": "./ets/widgets/pages/HotQuestionCard.ets",
+      "window": {
+        "designWidth": 720,
+        "autoDesignWidth": true
+      },
+      "colorMode": "auto",
+      "uiSyntax": "arkts",
+      "isDefault": true,
+      "supportDimensions": ["2*2", "2*4"],
+      "defaultDimension": "2*2",
+      "updateEnabled": true,
+      "scheduledUpdateTime": "10:30",
+      "updateDuration": 1,
+      "metadata": [
+        {
+          "name": "ohos.form.onEvent",
+          "value": "true"
+        }
+      ]
+    }
+  ]
+}

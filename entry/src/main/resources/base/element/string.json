@@ -1,0 +1,52 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "校园问答互助平台 - 知识共享，互助成长"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "校园问答互助平台主入口"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "校园问答"
+    },
+    {
+      "name": "app_name",
+      "value": "校园问答"
+    },
+    {
+      "name": "tab_home",
+      "value": "首页"
+    },
+    {
+      "name": "tab_topic",
+      "value": "话题"
+    },
+    {
+      "name": "tab_post",
+      "value": "提问"
+    },
+    {
+      "name": "tab_notification",
+      "value": "消息"
+    },
+    {
+      "name": "tab_profile",
+      "value": "我的"
+    },
+    {
+      "name": "search_placeholder",
+      "value": "搜索问题、话题、用户..."
+    },
+    {
+      "name": "login_title",
+      "value": "校园问答互助平台"
+    },
+    {
+      "name": "login_subtitle",
+      "value": "知识共享，互助成长"
+    }
+  ]
+}
