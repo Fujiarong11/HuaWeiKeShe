@@ -81,6 +81,7 @@ class MockDataStore {
     this.seedUsers();
     this.seedTopics();
     this.seedQuestions();
+    this.updateTopicQuestionCounts();
     this.seedAnswers();
     this.seedComments();
     this.seedNotifications();
@@ -177,8 +178,27 @@ class MockDataStore {
     t.icon = icon;
     t.color = color;
     t.followerCount = this.rand(50, 550);
-    t.questionCount = this.rand(20, 220);
+    t.questionCount = 0; // 稍后根据实际问题数据统计
     return t;
+  }
+
+  /**
+   * 根据实际问题数据更新每个话题的问题数量
+   */
+  private updateTopicQuestionCounts(): void {
+    // 初始化所有话题的问题数为0
+    for (const t of this.topics) {
+      t.questionCount = 0;
+    }
+    // 统计每个话题下的实际问题数
+    for (const q of this.questions) {
+      for (const tid of q.topicIds) {
+        const topic = this.topics.find(t => t.id === tid);
+        if (topic) {
+          topic.questionCount++;
+        }
+      }
+    }
   }
 
   // ========== 问题种子数据 ==========
@@ -611,6 +631,13 @@ export async function postQuestion(title: string, content: string, topicIds: str
   question.createdAt = new Date().toISOString();
   question.updatedAt = question.createdAt;
   store.questions.unshift(question);
+  // 更新相关话题的问题数量
+  for (const tid of topicIds) {
+    const topic = store.topics.find(t => t.id === tid);
+    if (topic) {
+      topic.questionCount++;
+    }
+  }
   return question;
 }
 

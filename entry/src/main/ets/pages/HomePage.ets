@@ -95,7 +95,10 @@ export struct HomePage {
                 .margin({ right: 8 })
                 .onClick(() => {
                   AppStorage.setOrCreate('searchKeyword', topic.name);
-                  router.pushUrl({ url: 'pages/SearchPage' });
+                  router.pushUrl({
+                    url: 'pages/SearchPage',
+                    params: { topicId: topic.id }
+                  });
                 })
             }, (topic: TopicModel) => topic.id)
           }.padding({ left: 16, right: 16 })

@@ -62,7 +62,10 @@ export struct TopicSquarePage {
                     .margin({ right: 8 })
                     .onClick(() => {
                       AppStorage.setOrCreate('searchKeyword', topic.name);
-                      router.pushUrl({ url: 'pages/SearchPage' });
+                      router.pushUrl({
+                        url: 'pages/SearchPage',
+                        params: { topicId: topic.id }
+                      });
                     })
                 },
                 (topic: TopicModel) => topic.id
@@ -88,7 +91,10 @@ export struct TopicSquarePage {
                 topic: topic,
                 onCardClick: () => {
                   AppStorage.setOrCreate('searchKeyword', topic.name);
-                  router.pushUrl({ url: 'pages/SearchPage' });
+                  router.pushUrl({
+                    url: 'pages/SearchPage',
+                    params: { topicId: topic.id }
+                  });
                 },
                 onFollowToggle: () => {
                   this.viewModel.toggleFollow(topic.id, this.currentUserId);

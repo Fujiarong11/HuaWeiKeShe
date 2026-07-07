@@ -7,13 +7,14 @@ import { UserModel } from '../model/UserModel';
 import { QuestionCard } from '../components/QuestionCard';
 import { SearchBar } from '../components/SearchBar';
 import { EmptyPlaceholder } from '../components/EmptyPlaceholder';
-import { searchAll } from '../mock/MockData';
+import { searchAll, getQuestionsByTopic } from '../mock/MockData';
 import { router } from '@kit.ArkUI';
 
 @Entry
 @Component
 export struct SearchPage {
   @StorageLink('searchKeyword') searchKeyword: string = '';
+  @State topicId: string = '';
   @State questions: QuestionModel[] = [];
   @State topics: TopicModel[] = [];
   @State users: UserModel[] = [];
@@ -23,21 +24,39 @@ export struct SearchPage {
   @State searchHistory: string[] = ['高等数学', '考研', '实习', '编程', '食堂'];
 
   async aboutToAppear(): Promise<void> {
+    // 检查是否从话题页跳转过来
+    const params = router.getParams() as Record<string, Object>;
+    if (params && params['topicId']) {
+      this.topicId = params['topicId'] as string;
+    }
     // 如果从话题页或其他页面传入关键词，自动搜索
-    if (this.searchKeyword) {
+    if (this.searchKeyword || this.topicId) {
       await this.performSearch(this.searchKeyword);
     }
   }
 
   async performSearch(keyword: string): Promise<void> {
-    if (!keyword.trim()) { return; }
+    if (!keyword.trim() && !this.topicId) { return; }
     this.hasSearched = true;
-    const results = await searchAll(keyword);
-    this.questions = results.questions;
-    this.topics = results.topics;
-    this.users = results.users;
+
+    // 如果从话题页进入，使用话题ID精确查询问题
+    if (this.topicId) {
+      this.questions = await getQuestionsByTopic(this.topicId);
+      // 话题和用户仍然用关键词搜索
+      if (keyword.trim()) {
+        const results = await searchAll(keyword);
+        this.topics = results.topics;
+        this.users = results.users;
+      }
+    } else {
+      const results = await searchAll(keyword);
+      this.questions = results.questions;
+      this.topics = results.topics;
+      this.users = results.users;
+    }
+
     this.dataVersion++;
-    if (!this.searchHistory.includes(keyword)) {
+    if (keyword.trim() && !this.searchHistory.includes(keyword)) {
       const newHistory: string[] = [keyword];
       for (const h of this.searchHistory) {
         if (newHistory.length < 10) { newHistory.push(h); }
@@ -133,6 +152,8 @@ export struct SearchPage {
                   .margin({ left: 16, right: 16, top: 4, bottom: 4 })
                   .onClick(() => {
                     AppStorage.setOrCreate('searchKeyword', t.name);
+                    this.topicId = t.id;
+                    this.activeTab = 0; // 切换到综合tab看问题结果
                     this.performSearch(t.name);
                   })
                 }, (t: TopicModel) => t.id)

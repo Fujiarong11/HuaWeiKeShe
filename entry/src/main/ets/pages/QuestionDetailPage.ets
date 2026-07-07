@@ -95,7 +95,10 @@ export struct QuestionDetailPage {
                       .onClick(() => {
                         const topicName = this.getTopicName(tid);
                         AppStorage.setOrCreate('searchKeyword', topicName);
-                        router.pushUrl({ url: 'pages/SearchPage' });
+                        router.pushUrl({
+                          url: 'pages/SearchPage',
+                          params: { topicId: tid }
+                        });
                       })
                   })
                 }.width('100%').margin({ top: 12 })

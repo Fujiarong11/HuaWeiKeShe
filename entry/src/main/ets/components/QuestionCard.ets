@@ -40,7 +40,10 @@ export struct QuestionCard {
                   .margin({ right: 6 })
                   .onClick(() => {
                     AppStorage.setOrCreate('searchKeyword', chip.name);
-                    router.pushUrl({ url: 'pages/SearchPage' });
+                    router.pushUrl({
+                      url: 'pages/SearchPage',
+                      params: { topicId: chip.id }
+                    });
                   })
               }, (chip: TopicChip) => chip.id)
             }
