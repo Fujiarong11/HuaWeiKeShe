@@ -1,13 +1,14 @@
 /**
  * 用户 ViewModel
- * 处理用户登录、个人主页、关注粉丝等逻辑
+ * 处理用户登录、注册、个人主页、关注粉丝等逻辑
  */
 import { UserModel } from '../model/UserModel';
 import { QuestionModel } from '../model/QuestionModel';
 import { AnswerModel } from '../model/AnswerModel';
 import { BasicDataSource } from '../common/datasource/BasicDataSource';
+import { AuthService } from '../services/AuthService';
+import { router } from '@kit.ArkUI';
 import {
-  getCurrentUser,
   getUserById,
   toggleFollowUser,
   getStore
@@ -20,6 +21,7 @@ export class UserViewModel {
   currentUser: UserModel | null = null;
   isLoading: boolean = false;
   isLoggedIn: boolean = false;
+  private authService: AuthService = AuthService.getInstance();
 
   // 他人主页数据
   viewingUser: UserModel | null = null;
@@ -39,18 +41,21 @@ export class UserViewModel {
   private constructor() {}
 
   /**
-   * 模拟登录 - 直接使用默认用户
+   * 用户登录 - 通过 AuthService 完成认证
    */
-  async login(): Promise<UserModel | null> {
+  async login(username: string, password: string): Promise<UserModel | null> {
     this.isLoading = true;
     try {
-      const user = await getCurrentUser();
-      this.currentUser = user;
-      this.isLoggedIn = true;
-      // 同步到 AppStorage
-      AppStorage.setOrCreate('currentUser', user);
-      AppStorage.setOrCreate('currentUserId', user.id);
-      return user;
+      const result = await this.authService.login(username, password);
+      if (result.success && result.user) {
+        this.currentUser = result.user;
+        this.isLoggedIn = true;
+        // 同步到 AppStorage
+        AppStorage.setOrCreate('currentUser', result.user);
+        AppStorage.setOrCreate('currentUserId', result.user.id);
+        return result.user;
+      }
+      return null;
     } catch (e) {
       return null;
     } finally {
@@ -59,13 +64,59 @@ export class UserViewModel {
   }
 
   /**
+   * 用户注册 - 通过 AuthService 完成注册并自动登录
+   */
+  async register(username: string, password: string): Promise<UserModel | null> {
+    this.isLoading = true;
+    try {
+      const result = await this.authService.register(username, password);
+      if (result.success && result.user) {
+        this.currentUser = result.user;
+        this.isLoggedIn = true;
+        // 同步到 AppStorage
+        AppStorage.setOrCreate('currentUser', result.user);
+        AppStorage.setOrCreate('currentUserId', result.user.id);
+        return result.user;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  /**
+   * 尝试从本地恢复登录状态
+   */
+  async tryRestoreSession(): Promise<boolean> {
+    try {
+      const user = await this.authService.tryRestoreSession();
+      if (user) {
+        this.currentUser = user;
+        this.isLoggedIn = true;
+        AppStorage.setOrCreate('currentUser', user);
+        AppStorage.setOrCreate('currentUserId', user.id);
+        return true;
+      }
+    } catch (e) {
+      // 恢复失败
+    }
+    return false;
+  }
+
+  /**
    * 登出
    */
-  logout(): void {
+  async logout(): Promise<void> {
+    await this.authService.logout();
     this.currentUser = null;
     this.isLoggedIn = false;
     AppStorage.setOrCreate('currentUser', null);
     AppStorage.setOrCreate('currentUserId', '');
+    // 跳转到登录页并清空页面栈
+    router.clear();
+    router.replaceUrl({ url: 'pages/LoginPage' });
   }
 
   /**

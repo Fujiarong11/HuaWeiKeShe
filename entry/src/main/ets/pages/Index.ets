@@ -9,6 +9,7 @@ import { NotificationPage } from './NotificationPage';
 import { ProfilePage } from './ProfilePage';
 import { UserViewModel } from '../viewmodel/UserViewModel';
 import { getUnreadNotificationCount } from '../mock/MockData';
+import { router } from '@kit.ArkUI';
 
 @Entry
 @Component
@@ -19,22 +20,23 @@ struct Index {
   @StorageLink('switchToTab') switchToTab: number = -1;
   @State unreadCount: number = 0;
   @State isLoggedIn: boolean = false;
+  @State isCheckingAuth: boolean = true;  // 启动时检查登录状态
   private userVM: UserViewModel = UserViewModel.getInstance();
 
   async aboutToAppear(): Promise<void> {
-    // 自动登录
-    if (!this.currentUserId) {
-      const user = await this.userVM.login();
-      if (user) {
-        this.isLoggedIn = true;
-      }
-    } else {
-      this.isLoggedIn = true;
-    }
+    // 1. 先尝试从本地恢复登录状态
+    const restored = await this.userVM.tryRestoreSession();
 
-    // 加载未读通知数
-    if (this.currentUserId) {
+    if (restored && this.currentUserId) {
+      // 恢复成功，直接进入首页
+      this.isLoggedIn = true;
+      this.isCheckingAuth = false;
+      // 加载未读通知数
       this.unreadCount = await getUnreadNotificationCount(this.currentUserId);
+    } else {
+      // 2. 未登录，跳转到登录页
+      this.isCheckingAuth = false;
+      router.replaceUrl({ url: 'pages/LoginPage' });
     }
   }
 
@@ -53,13 +55,27 @@ struct Index {
   }
 
   build() {
-    if (!this.isLoggedIn) {
-      // 未登录时显示登录页（简化处理：自动登录，几乎不会经过这里）
+    if (this.isCheckingAuth) {
+      // 启动时检查登录状态
       Column() {
         LoadingProgress()
           .width(36)
           .height(36)
-        Text('正在登录...')
+        Text('正在加载...')
+          .fontSize(14)
+          .fontColor('#999')
+          .margin({ top: 12 })
+      }
+      .width('100%')
+      .height('100%')
+      .justifyContent(FlexAlign.Center)
+    } else if (!this.isLoggedIn) {
+      // 未登录 - 跳转中（通常不会经过这里，已在 aboutToAppear 中跳转）
+      Column() {
+        LoadingProgress()
+          .width(36)
+          .height(36)
+        Text('正在跳转登录...')
           .fontSize(14)
           .fontColor('#999')
           .margin({ top: 12 })
