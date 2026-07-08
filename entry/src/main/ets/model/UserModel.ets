@@ -31,6 +31,25 @@ export class UserModel {
 }
 
 /**
+ * 登录结果
+ */
+export interface LoginResult {
+  success: boolean;
+  user?: UserModel;
+  token?: string;
+  error?: string;
+}
+
+/**
+ * 注册结果
+ */
+export interface RegisterResult {
+  success: boolean;
+  user?: UserModel;
+  error?: string;
+}
+
+/**
  * 声望变化记录
  */
 @Observed
