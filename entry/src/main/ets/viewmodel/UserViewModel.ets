@@ -41,12 +41,12 @@ export class UserViewModel {
   private constructor() {}
 
   /**
-   * 用户登录 - 通过 AuthService 完成认证
+   * 用户登录 - 通过 AuthService 完成认证（手机号 + 密码）
    */
-  async login(username: string, password: string): Promise<UserModel | null> {
+  async login(phone: string, password: string): Promise<UserModel | null> {
     this.isLoading = true;
     try {
-      const result = await this.authService.login(username, password);
+      const result = await this.authService.login(phone, password);
       if (result.success && result.user) {
         this.currentUser = result.user;
         this.isLoggedIn = true;
@@ -64,12 +64,12 @@ export class UserViewModel {
   }
 
   /**
-   * 用户注册 - 通过 AuthService 完成注册并自动登录
+   * 用户注册 - 通过 AuthService 完成注册并自动登录（用户名 + 手机号 + 密码）
    */
-  async register(username: string, password: string): Promise<UserModel | null> {
+  async register(username: string, phone: string, password: string): Promise<UserModel | null> {
     this.isLoading = true;
     try {
-      const result = await this.authService.register(username, password);
+      const result = await this.authService.register(username, phone, password);
       if (result.success && result.user) {
         this.currentUser = result.user;
         this.isLoggedIn = true;
