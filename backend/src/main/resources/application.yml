@@ -23,3 +23,7 @@ mybatis-plus:
 logging:
   level:
     com.campusqa: debug
+
+# 管理员配置
+admin:
+  password: admin123
