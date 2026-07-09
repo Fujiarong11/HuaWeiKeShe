@@ -10,5 +10,5 @@
  */
 export class ApiConfig {
   /** 后端 API 基础地址 */
-  static BASE_URL: string = 'http://192.168.1.100:8080';
+  static BASE_URL: string = 'http://172.20.10.5:8080';
 }
