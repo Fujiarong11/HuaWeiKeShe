@@ -107,6 +107,7 @@ export class AuthService {
         totalQuestions: 0,
         followerCount: 0,
         followingCount: 0,
+        followedTopicIds: '[]',
         createdAt: new Date().toISOString()
       };
       const res: ApiResult = await UserApi.userRegister(userRow);

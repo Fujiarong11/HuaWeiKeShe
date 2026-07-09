@@ -138,6 +138,14 @@ export class MockDataStore {
    * 确保用户数据在内存 store 中存在，以便后续操作能找到 author
    */
   syncUserFromDb(userRow: UserRow): UserModel {
+    let followedIds: string[] = [];
+    try {
+      const parsed: Object = JSON.parse(userRow.followedTopicIds) as Object;
+      followedIds = parsed as string[];
+    } catch (_e) {
+      followedIds = [];
+    }
+
     const existing: UserModel | undefined = this.users.find(u => u.id === userRow.id);
     if (existing) {
       existing.name = userRow.name || userRow.username;
@@ -152,6 +160,8 @@ export class MockDataStore {
       existing.totalQuestions = userRow.totalQuestions;
       existing.followerCount = userRow.followerCount;
       existing.followingCount = userRow.followingCount;
+      existing.followedTopicIds = followedIds;
+      this.restoreTopicFollowState(followedIds);
       return existing;
     }
     const u: UserModel = new UserModel();
@@ -169,8 +179,19 @@ export class MockDataStore {
     u.followerCount = userRow.followerCount;
     u.followingCount = userRow.followingCount;
     u.createdAt = userRow.createdAt;
+    u.followedTopicIds = followedIds;
     this.users.push(u);
+    this.restoreTopicFollowState(followedIds);
     return u;
+  }
+
+  private restoreTopicFollowState(followedIds: string[]): void {
+    for (const tid of followedIds) {
+      const topic: TopicModel | undefined = this.topics.find(t => t.id === tid);
+      if (topic) {
+        topic.isFollowed = true;
+      }
+    }
   }
 
   // ========== Row → Model 转换 ==========
@@ -494,6 +515,7 @@ export async function postQuestion(title: string, content: string, topicIds: str
       totalQuestions: author.totalQuestions,
       followerCount: author.followerCount,
       followingCount: author.followingCount,
+      followedTopicIds: JSON.stringify(author.followedTopicIds),
       createdAt: author.createdAt
     });
   }
@@ -521,6 +543,138 @@ export async function toggleQuestionCollect(questionId: string): Promise<Questio
     q.followerCount += q.isCollected ? 1 : -1;
   }
   return q;
+}
+
+// ========== 删除操作 ==========
+
+export async function deleteQuestion(questionId: string): Promise<boolean> {
+  await delay(100);
+  const store: MockDataStore = getStore();
+  const qIdx: number = store.questions.findIndex(q => q.id === questionId);
+  if (qIdx < 0) { return false; }
+  const question: QuestionModel = store.questions[qIdx];
+
+  const remaining: AnswerModel[] = [];
+  for (const a of store.answers) {
+    if (a.questionId !== questionId) {
+      remaining.push(a);
+    }
+  }
+  store.answers = remaining;
+
+  const newQuestions: QuestionModel[] = [];
+  for (let i = 0; i < store.questions.length; i++) {
+    if (i !== qIdx) { newQuestions.push(store.questions[i]); }
+  }
+  store.questions = newQuestions;
+
+  const author: UserModel | undefined = store.users.find(u => u.id === question.author.id);
+  if (author && author.totalQuestions > 0) {
+    author.totalQuestions--;
+  }
+
+  for (const tid of question.topicIds) {
+    const topic: TopicModel | undefined = store.topics.find(t => t.id === tid);
+    if (topic && topic.questionCount > 0) {
+      topic.questionCount--;
+    }
+  }
+
+  await DatabaseHelper.deleteAnswersByQuestionId(questionId);
+  await DatabaseHelper.deleteQuestion(questionId);
+
+  if (author) {
+    DatabaseHelper.updateUser({
+      id: author.id,
+      phone: author.id,
+      username: author.name,
+      password: '',
+      name: author.name,
+      avatar: author.avatar,
+      bio: author.bio,
+      college: author.college,
+      major: author.major,
+      grade: author.grade,
+      reputation: author.reputation,
+      acceptedCount: author.acceptedCount,
+      totalAnswers: author.totalAnswers,
+      totalQuestions: author.totalQuestions,
+      followerCount: author.followerCount,
+      followingCount: author.followingCount,
+      followedTopicIds: JSON.stringify(author.followedTopicIds),
+      createdAt: author.createdAt
+    });
+  }
+
+  return true;
+}
+
+export async function deleteAnswer(answerId: string): Promise<boolean> {
+  await delay(100);
+  const store: MockDataStore = getStore();
+  const aIdx: number = store.answers.findIndex(a => a.id === answerId);
+  if (aIdx < 0) { return false; }
+  const answer: AnswerModel = store.answers[aIdx];
+
+  const remaining: AnswerModel[] = [];
+  for (let i = 0; i < store.answers.length; i++) {
+    if (i !== aIdx) { remaining.push(store.answers[i]); }
+  }
+  store.answers = remaining;
+
+  const question: QuestionModel | undefined = store.questions.find(q => q.id === answer.questionId);
+  if (question && question.answerCount > 0) {
+    question.answerCount--;
+  }
+
+  const author: UserModel | undefined = store.users.find(u => u.id === answer.author.id);
+  if (author && author.totalAnswers > 0) {
+    author.totalAnswers--;
+  }
+
+  await DatabaseHelper.deleteAnswer(answerId);
+  if (question) {
+    DatabaseHelper.updateQuestion({
+      id: question.id,
+      title: question.title,
+      content: question.content,
+      authorId: question.author.id,
+      authorName: question.author.name,
+      authorAvatar: question.author.avatar,
+      topicIds: JSON.stringify(question.topicIds),
+      status: question.status === QuestionStatus.RESOLVED ? 'RESOLVED' : 'OPEN',
+      viewCount: question.viewCount,
+      likeCount: question.likeCount,
+      followerCount: question.followerCount,
+      answerCount: question.answerCount,
+      createdAt: question.createdAt,
+      updatedAt: question.updatedAt
+    });
+  }
+  if (author) {
+    DatabaseHelper.updateUser({
+      id: author.id,
+      phone: author.id,
+      username: author.name,
+      password: '',
+      name: author.name,
+      avatar: author.avatar,
+      bio: author.bio,
+      college: author.college,
+      major: author.major,
+      grade: author.grade,
+      reputation: author.reputation,
+      acceptedCount: author.acceptedCount,
+      totalAnswers: author.totalAnswers,
+      totalQuestions: author.totalQuestions,
+      followerCount: author.followerCount,
+      followingCount: author.followingCount,
+      followedTopicIds: JSON.stringify(author.followedTopicIds),
+      createdAt: author.createdAt
+    });
+  }
+
+  return true;
 }
 
 // ========== 回答相关 API ==========
@@ -598,6 +752,7 @@ export async function postAnswer(questionId: string, content: string, authorId: 
       totalQuestions: author.totalQuestions,
       followerCount: author.followerCount,
       followingCount: author.followingCount,
+      followedTopicIds: JSON.stringify(author.followedTopicIds),
       createdAt: author.createdAt
     });
   }
@@ -654,6 +809,7 @@ export async function acceptAnswer(answerId: string): Promise<AnswerModel | unde
         totalQuestions: author.totalQuestions,
         followerCount: author.followerCount,
         followingCount: author.followingCount,
+      followedTopicIds: JSON.stringify(author.followedTopicIds),
         createdAt: author.createdAt
       });
     }
@@ -799,11 +955,91 @@ export async function toggleFollowUser(targetUserId: string, currentUserId: stri
   const store: MockDataStore = getStore();
   const target: UserModel | undefined = store.users.find(u => u.id === targetUserId);
   const current: UserModel | undefined = store.users.find(u => u.id === currentUserId);
-  if (target && current) {
+  if (!target || !current) { return target; }
+
+  const isFollowing: boolean = current.followedUserIds.includes(targetUserId);
+
+  if (isFollowing) {
+    // 取关：减计数，移出关注/粉丝列表
+    target.followerCount = Math.max(0, target.followerCount - 1);
+    current.followingCount = Math.max(0, current.followingCount - 1);
+    target.followerUserIds = target.followerUserIds.filter((id: string) => id !== currentUserId);
+    current.followedUserIds = current.followedUserIds.filter((id: string) => id !== targetUserId);
+  } else {
+    // 关注：加计数，加入关注/粉丝列表
     target.followerCount += 1;
     current.followingCount += 1;
+    if (!target.followerUserIds.includes(currentUserId)) {
+      target.followerUserIds = [...target.followerUserIds, currentUserId];
+    }
+    if (!current.followedUserIds.includes(targetUserId)) {
+      current.followedUserIds = [...current.followedUserIds, targetUserId];
+    }
   }
+
+  // 持久化双方用户数据到 DB
+  DatabaseHelper.updateUser({
+    id: target.id, phone: target.id, username: target.name, password: '',
+    name: target.name, avatar: target.avatar, bio: target.bio,
+    college: target.college, major: target.major, grade: target.grade,
+    reputation: target.reputation, acceptedCount: target.acceptedCount,
+    totalAnswers: target.totalAnswers, totalQuestions: target.totalQuestions,
+    followerCount: target.followerCount, followingCount: target.followingCount,
+    followedTopicIds: JSON.stringify(target.followedTopicIds),
+    createdAt: target.createdAt
+  });
+  DatabaseHelper.updateUser({
+    id: current.id, phone: current.id, username: current.name, password: '',
+    name: current.name, avatar: current.avatar, bio: current.bio,
+    college: current.college, major: current.major, grade: current.grade,
+    reputation: current.reputation, acceptedCount: current.acceptedCount,
+    totalAnswers: current.totalAnswers, totalQuestions: current.totalQuestions,
+    followerCount: current.followerCount, followingCount: current.followingCount,
+    followedTopicIds: JSON.stringify(current.followedTopicIds),
+    createdAt: current.createdAt
+  });
+
+  // 同步 AppStorage 中的 currentUser
+  const appUser: UserModel | undefined = AppStorage.get<UserModel>('currentUser');
+  if (appUser && appUser.id === currentUserId) {
+    AppStorage.setOrCreate('currentUser', current);
+  }
+
   return target;
+}
+
+export async function isFollowingUser(currentUserId: string, targetUserId: string): Promise<boolean> {
+  await delay(50);
+  const store: MockDataStore = getStore();
+  const current: UserModel | undefined = store.users.find(u => u.id === currentUserId);
+  if (!current) { return false; }
+  return current.followedUserIds.includes(targetUserId);
+}
+
+export async function getFollowingUsers(userId: string): Promise<UserModel[]> {
+  await delay();
+  const store: MockDataStore = getStore();
+  const user: UserModel | undefined = store.users.find(u => u.id === userId);
+  if (!user) { return []; }
+  const result: UserModel[] = [];
+  for (const id of user.followedUserIds) {
+    const u: UserModel | undefined = store.users.find(u => u.id === id);
+    if (u) { result.push(u); }
+  }
+  return result;
+}
+
+export async function getFollowerUsers(userId: string): Promise<UserModel[]> {
+  await delay();
+  const store: MockDataStore = getStore();
+  const user: UserModel | undefined = store.users.find(u => u.id === userId);
+  if (!user) { return []; }
+  const result: UserModel[] = [];
+  for (const id of user.followerUserIds) {
+    const u: UserModel | undefined = store.users.find(u => u.id === id);
+    if (u) { result.push(u); }
+  }
+  return result;
 }
 
 // ========== 通知相关 API ==========

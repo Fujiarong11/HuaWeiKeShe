@@ -12,6 +12,7 @@ export struct QuestionCard {
   @ObjectLink question: QuestionModel;
   @Prop showTopicTags: boolean = true;
   onCardClick?: () => void;
+  onAuthorClick?: (userId: string) => void;
 
   build() {
     Column() {
@@ -62,7 +63,12 @@ export struct QuestionCard {
           user: this.question.author,
           avatarSize: 24,
           showReputation: false,
-          showTime: this.question.formattedTime
+          showTime: this.question.formattedTime,
+          onUserClick: (userId: string) => {
+            if (this.onAuthorClick) {
+              this.onAuthorClick(userId);
+            }
+          }
         })
 
         Blank()

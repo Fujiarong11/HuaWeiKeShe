@@ -10,6 +10,7 @@ export struct UserInfoBar {
   @Prop showReputation: boolean = true;
   @Prop avatarSize: number = 36;
   @Prop showTime: string = '';
+  onUserClick?: (userId: string) => void;
 
   build() {
     Row() {
@@ -66,6 +67,11 @@ export struct UserInfoBar {
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)
+    .onClick(() => {
+      if (this.onUserClick && this.user.id) {
+        this.onUserClick(this.user.id);
+      }
+    })
   }
 
   /**

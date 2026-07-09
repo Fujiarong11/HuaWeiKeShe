@@ -4,6 +4,7 @@
     "pages/login-register/LoginPage",
     "pages/question/QuestionDetailPage",
     "pages/discover/SearchPage",
-    "pages/user/UserProfilePage"
+    "pages/user/UserProfilePage",
+    "pages/FollowListPage"
   ]
 }

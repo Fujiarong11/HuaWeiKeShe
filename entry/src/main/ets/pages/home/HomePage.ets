@@ -1,6 +1,6 @@
 /**
  * 首页推荐页面
- * 展示个性化推荐的问题信息流
+ * 展示个性化推荐的问题信息流，支持下拉刷新
  */
 import { QuestionModel } from '../../model/QuestionModel';
 import { TopicModel } from '../../model/TopicModel';
@@ -18,6 +18,7 @@ export struct HomePage {
   private viewModel: HomeViewModel = HomeViewModel.getInstance();
   @State currentTab: number = 0;
   @State dataVersion: number = 0;
+  @State isRefreshing: boolean = false;
   private lastRefreshTrigger: number = 0;
   private tabTitles: string[] = ['推荐', '热门', '最新', '关注'];
   private tabTypes: HomeTabType[] = [
@@ -32,15 +33,12 @@ export struct HomePage {
   }
 
   onPageShow(): void {
-    this.loadData();
-    // 检查是否需要刷新（其他页面发布新问题后触发）
     if (this.homeRefreshTrigger !== this.lastRefreshTrigger) {
       this.lastRefreshTrigger = this.homeRefreshTrigger;
       this.loadData();
     }
   }
 
-  // 监听 AppStorage 中的刷新触发器（其他页面发布新问题后会触发）
   build() {
     Column() {
       // 顶部搜索栏
@@ -107,55 +105,73 @@ export struct HomePage {
         .width('100%').height(36)
       }
 
-      // 问题列表 — 使用 dataVersion 强制重新求值
-      if (this.dataVersion > 0 && this.viewModel.questionDataSource.totalCount() > 0 ||
-        !this.viewModel.isLoading && this.viewModel.questionDataSource.totalCount() > 0) {
-        List() {
-          LazyForEach(this.viewModel.questionDataSource, (question: QuestionModel) => {
-            ListItem() {
-              QuestionCard({
-                question: question,
-                showTopicTags: true,
-                onCardClick: () => {
-                  router.pushUrl({
-                    url: 'pages/question/QuestionDetailPage',
-                    params: { questionId: question.id }
-                  });
-                }
-              })
-              .margin({ left: 16, right: 16, top: 6, bottom: 6 })
-            }
-          }, (question: QuestionModel) => question.id)
+      // 下拉刷新 + 问题列表
+      Refresh({ refreshing: $$this.isRefreshing }) {
+        if (this.dataVersion > 0 && this.viewModel.questionDataSource.totalCount() > 0 ||
+          !this.viewModel.isLoading && this.viewModel.questionDataSource.totalCount() > 0) {
+          List() {
+            LazyForEach(this.viewModel.questionDataSource, (question: QuestionModel) => {
+              ListItem() {
+                QuestionCard({
+                  question: question,
+                  showTopicTags: true,
+                  onCardClick: () => {
+                    router.pushUrl({
+                      url: 'pages/question/QuestionDetailPage',
+                      params: { questionId: question.id }
+                    });
+                  },
+                  onAuthorClick: (userId: string) => {
+                    AppStorage.setOrCreate('targetUserId', userId);
+                    router.pushUrl({ url: 'pages/user/UserProfilePage' });
+                  }
+                })
+                .margin({ left: 16, right: 16, top: 6, bottom: 6 })
+              }
+            }, (question: QuestionModel) => question.id)
 
-          ListItem() {
-            LoadingFooter({
-              isLoading: this.viewModel.isLoading,
-              hasMore: this.viewModel.hasMore,
-              text: '— 没有更多问题了 —'
+            ListItem() {
+              LoadingFooter({
+                isLoading: this.viewModel.isLoading,
+                hasMore: this.viewModel.hasMore,
+                text: '— 没有更多问题了 —'
+              })
+            }
+          }
+          .width('100%').layoutWeight(1).backgroundColor('#F5F6FA')
+          .scrollBar(BarState.Off)
+          .onReachEnd(() => {
+            this.viewModel.loadMore(this.currentUserId);
+          })
+        } else if (this.viewModel.isLoading && this.dataVersion === 0) {
+          Column() {
+            LoadingProgress().width(36).height(36)
+            Text('正在加载...').fontSize(14).fontColor('#999').margin({ top: 12 })
+          }
+          .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center)
+        } else {
+          Column() {
+            EmptyPlaceholder({
+              icon: '📝',
+              title: '暂无内容',
+              description: '还没有人提问，快去发布第一个问题吧'
             })
           }
+          .width('100%').layoutWeight(1)
         }
-        .width('100%').layoutWeight(1).backgroundColor('#F5F6FA')
-        .scrollBar(BarState.Off)
-        .onReachEnd(() => {
-          this.viewModel.loadMore(this.currentUserId);
-        })
-      } else if (this.viewModel.isLoading && this.dataVersion === 0) {
-        Column() {
-          LoadingProgress().width(36).height(36)
-          Text('正在加载...').fontSize(14).fontColor('#999').margin({ top: 12 })
-        }
-        .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center)
-      } else {
-        EmptyPlaceholder({
-          icon: '📝',
-          title: '暂无内容',
-          description: '还没有人提问，快去发布第一个问题吧'
-        })
-        .width('100%').layoutWeight(1)
       }
+      .onRefreshing(() => {
+        this.onRefresh();
+      })
+      .layoutWeight(1)
     }
     .width('100%').height('100%').backgroundColor('#F5F6FA')
+  }
+
+  private async onRefresh(): Promise<void> {
+    this.isRefreshing = true;
+    await this.loadData();
+    this.isRefreshing = false;
   }
 
   private async loadData(): Promise<void> {

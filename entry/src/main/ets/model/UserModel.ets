@@ -17,6 +17,8 @@ export class UserModel {
   followerCount: number = 0;
   followingCount: number = 0;
   followedTopicIds: string[] = [];
+  followedUserIds: string[] = [];
+  followerUserIds: string[] = [];
   likedAnswerIds: string[] = [];
   collectedQuestionIds: string[] = [];
   createdAt: string = '';

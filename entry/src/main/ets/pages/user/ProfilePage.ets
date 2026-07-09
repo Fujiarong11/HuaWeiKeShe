@@ -7,10 +7,11 @@ import { QuestionModel, QuestionStatus } from '../../model/QuestionModel';
 import { AnswerModel } from '../../model/AnswerModel';
 import { QuestionCard } from '../../components/QuestionCard';
 import { UserViewModel } from '../../viewmodel/UserViewModel';
-import { DatabaseHelper, QuestionRow, AnswerRow } from '../../data/DatabaseHelper';
+import { DatabaseHelper, QuestionRow, AnswerRow, UserRow } from '../../data/DatabaseHelper';
 import { TopicModel } from '../../model/TopicModel';
-import { getStore } from '../../mock/MockData';
+import { getStore, deleteQuestion, deleteAnswer } from '../../mock/MockData';
 import { router } from '@kit.ArkUI';
+import { promptAction } from '@kit.ArkUI';
 
 @Component
 export struct ProfilePage {
@@ -23,14 +24,31 @@ export struct ProfilePage {
   @State myAnswers: AnswerModel[] = [];
   @State followedTopicCount: number = 0;
   @State followedTopics: TopicModel[] = [];
+  @State isRefreshing: boolean = false;
 
   async aboutToAppear(): Promise<void> {
     await this.loadUserContent();
   }
 
+  async onRefresh(): Promise<void> {
+    this.isRefreshing = true;
+    await this.loadUserContent();
+    if (this.currentUserId) {
+      const store = getStore();
+      const dbUser: UserRow | null = await DatabaseHelper.queryUserById(this.currentUserId);
+      if (dbUser) {
+        store.syncUserFromDb(dbUser);
+        const user: UserModel | undefined = store.users.find(u => u.id === this.currentUserId);
+        if (user) {
+          AppStorage.setOrCreate('currentUser', user);
+        }
+      }
+    }
+    this.isRefreshing = false;
+  }
+
   async loadUserContent(): Promise<void> {
     if (!this.currentUserId) { return; }
-    // 从数据库加载当前用户的提问和回答
     const dbQuestions: QuestionRow[] = await DatabaseHelper.queryQuestionsByAuthor(this.currentUserId);
     const dbAnswers: AnswerRow[] = await DatabaseHelper.queryAnswersByAuthor(this.currentUserId);
 
@@ -74,9 +92,12 @@ export struct ProfilePage {
     this.myQuestions = questions;
     this.myAnswers = answers;
 
-    // 加载关注的话题
     const store = getStore();
-    const user: UserModel | undefined = store.users.find(u => u.id === this.currentUserId);
+    const refreshed = store.users.find(u => u.id === this.currentUserId);
+    if (refreshed) {
+      AppStorage.setOrCreate('currentUser', refreshed);
+    }
+    const user: UserModel | undefined = refreshed;
     if (user && user.followedTopicIds) {
       this.followedTopicCount = user.followedTopicIds.length;
       this.followedTopics = store.topics.filter(t => user.followedTopicIds.includes(t.id));
@@ -94,12 +115,19 @@ export struct ProfilePage {
       }
       .width('100%').height('100%').justifyContent(FlexAlign.Center)
     } else {
-      Scroll() {
-        Column() {
-          // 顶部个人信息卡片
+      Refresh({ refreshing: $$this.isRefreshing }) {
+        Scroll() {
+          Column() {
+            Text('')
+              .width(0).height(0).fontSize(0)
+              .id(`refresh_${this.profileRefreshTrigger}`)
+              .onAppear(() => {
+                this.loadUserContent();
+              })
+
+            // 顶部个人信息卡片
           Column() {
             Row() {
-              // 头像
               Text(this.currentUser.name.charAt(0))
                 .fontSize(32).fontColor(Color.White).fontWeight(FontWeight.Bold)
                 .width(72).height(72).borderRadius(36)
@@ -116,19 +144,33 @@ export struct ProfilePage {
               .alignItems(HorizontalAlign.Start).margin({ left: 14 }).layoutWeight(1)
             }.width('100%')
 
-            // 统计数字
             Row() {
               this.StatColumn('声望', this.currentUser.reputation)
-              this.StatColumn('采纳率', '0%')
+              this.StatColumn('采纳率', `${this.currentUser.acceptanceRate}%`)
               Column() {
-                Text(`${this.followedTopicCount}`)
-                  .fontSize(18).fontWeight(FontWeight.Bold).fontColor('#4A90D9')
-                Text('关注话题')
-                  .fontSize(12).fontColor('#999').margin({ top: 4 })
+                Text(`${this.currentUser.followingCount}`)
+                  .fontSize(18).fontWeight(FontWeight.Bold).fontColor('#1A1A1A')
+                Text('关注').fontSize(12).fontColor('#999').margin({ top: 4 })
               }
               .alignItems(HorizontalAlign.Center)
-              .onClick(() => { this.showFollowedTopics(); })
-              this.StatColumn('粉丝', this.currentUser.followerCount)
+              .onClick(() => {
+                router.pushUrl({
+                  url: 'pages/FollowListPage',
+                  params: { mode: 'following', userId: this.currentUserId }
+                });
+              })
+              Column() {
+                Text(`${this.currentUser.followerCount}`)
+                  .fontSize(18).fontWeight(FontWeight.Bold).fontColor('#1A1A1A')
+                Text('粉丝').fontSize(12).fontColor('#999').margin({ top: 4 })
+              }
+              .alignItems(HorizontalAlign.Center)
+              .onClick(() => {
+                router.pushUrl({
+                  url: 'pages/FollowListPage',
+                  params: { mode: 'followers', userId: this.currentUserId }
+                });
+              })
             }
             .width('100%').margin({ top: 16 })
             .justifyContent(FlexAlign.SpaceAround)
@@ -165,16 +207,31 @@ export struct ProfilePage {
               }.width('100%').padding(40).alignItems(HorizontalAlign.Center)
             } else {
               ForEach(this.myQuestions, (question: QuestionModel) => {
-                QuestionCard({
-                  question: question,
-                  showTopicTags: true,
-                  onCardClick: () => {
-                    router.pushUrl({
-                      url: 'pages/question/QuestionDetailPage',
-                      params: { questionId: question.id }
-                    });
-                  }
-                })
+                Stack({ alignContent: Alignment.TopEnd }) {
+                  QuestionCard({
+                    question: question,
+                    showTopicTags: true,
+                    onCardClick: () => {
+                      router.pushUrl({
+                        url: 'pages/question/QuestionDetailPage',
+                        params: { questionId: question.id }
+                      });
+                    },
+                    onAuthorClick: (userId: string) => {
+                      AppStorage.setOrCreate('targetUserId', userId);
+                      router.pushUrl({ url: 'pages/user/UserProfilePage' });
+                    }
+                  })
+
+                  Text('✕')
+                    .fontSize(14).fontColor('#E8634A')
+                    .width(28).height(28)
+                    .borderRadius(14).backgroundColor('rgba(255,255,255,0.9)')
+                    .textAlign(TextAlign.Center)
+                    .margin({ top: 8, right: 8 })
+                    .onClick(() => { this.handleDeleteQuestion(question.id); })
+                }
+                .width('100%')
                 .margin({ left: 16, right: 16, top: 6, bottom: 6 })
               }, (question: QuestionModel) => question.id)
             }
@@ -199,7 +256,12 @@ export struct ProfilePage {
                   Row() {
                     Text(`👍 ${answer.likeCount}`).fontSize(11).fontColor('#BBB')
                     Text(`💬 ${answer.commentCount}`).fontSize(11).fontColor('#BBB').margin({ left: 12 })
-                  }.margin({ top: 8 })
+                    Blank()
+                    Text('删除')
+                      .fontSize(11).fontColor('#E8634A')
+                      .padding({ left: 8, right: 4, top: 2, bottom: 2 })
+                      .onClick(() => { this.handleDeleteAnswer(answer.id); })
+                  }.width('100%').margin({ top: 8 })
                 }
                 .width('100%').padding(14).backgroundColor(Color.White).borderRadius(10)
                 .margin({ left: 16, right: 16, top: 6, bottom: 6 })
@@ -218,6 +280,10 @@ export struct ProfilePage {
         }.width('100%')
       }
       .width('100%').height('100%').backgroundColor('#F5F6FA').scrollBar(BarState.Off)
+    }
+    .onRefreshing(() => {
+      this.onRefresh();
+    })
     }
   }
 
@@ -243,11 +309,35 @@ export struct ProfilePage {
     this.userVM.logout();
   }
 
-  /**
-   * 点击关注话题，跳转到话题广场查看已关注的话题
-   */
-  private showFollowedTopics(): void {
-    // 切换到话题广场 Tab（Tab 1）
-    AppStorage.setOrCreate('switchToTab', 1);
+  private async handleDeleteQuestion(questionId: string): Promise<void> {
+    const dialog = promptAction.showDialog({
+      title: '确认删除',
+      message: '删除提问后，该问题下的所有回答也会被删除，确定继续吗？',
+      buttons: [
+        { text: '取消', color: '#999' },
+        { text: '删除', color: '#E8634A' }
+      ]
+    });
+    const result = await dialog;
+    if (result.index === 1) {
+      await deleteQuestion(questionId);
+      await this.loadUserContent();
+    }
+  }
+
+  private async handleDeleteAnswer(answerId: string): Promise<void> {
+    const dialog = promptAction.showDialog({
+      title: '确认删除',
+      message: '确定要删除这条回答吗？',
+      buttons: [
+        { text: '取消', color: '#999' },
+        { text: '删除', color: '#E8634A' }
+      ]
+    });
+    const result = await dialog;
+    if (result.index === 1) {
+      await deleteAnswer(answerId);
+      await this.loadUserContent();
+    }
   }
 }

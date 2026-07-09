@@ -127,6 +127,10 @@ export struct SearchPage {
                         url: 'pages/question/QuestionDetailPage',
                         params: { questionId: q.id }
                       });
+                    },
+                    onAuthorClick: (userId: string) => {
+                      AppStorage.setOrCreate('targetUserId', userId);
+                      router.pushUrl({ url: 'pages/user/UserProfilePage' });
                     }
                   }).margin({ left: 16, right: 16, top: 4, bottom: 4 })
                 }, (q: QuestionModel) => q.id)

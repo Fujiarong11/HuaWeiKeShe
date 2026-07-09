@@ -14,9 +14,11 @@ import { router } from '@kit.ArkUI';
 export struct UserProfilePage {
   @StorageLink('targetUserId') userId: string = '';
   @StorageLink('currentUserId') currentUserId: string = '';
+  @StorageLink('currentUser') currentUser: UserModel | null = null;
   private userVM: UserViewModel = UserViewModel.getInstance();
   @State activeTab: number = 0;
   @State dataVersion: number = 0;
+  @State isFollowing: boolean = false;
 
   async aboutToAppear(): Promise<void> {
     if (this.userId) {
@@ -27,6 +29,10 @@ export struct UserProfilePage {
       const answers: AnswerModel[] = store.answers.filter((a: AnswerModel): boolean => a.author.id === this.userId);
       this.userVM.userQuestions.reloadData(questions);
       this.userVM.userAnswers.reloadData(answers);
+      // 检查是否已关注
+      if (this.currentUser) {
+        this.isFollowing = this.currentUser.followedUserIds.includes(this.userId);
+      }
       this.dataVersion++;
     }
   }
@@ -65,11 +71,20 @@ export struct UserProfilePage {
 
               if (this.userVM.viewingUser.id !== this.currentUserId) {
                 Row() {
-                  Button('+ 关注')
-                    .fontSize(14).fontColor(Color.White)
-                    .backgroundColor('#4A90D9').borderRadius(20)
+                  Button(this.isFollowing ? '已关注' : '+ 关注')
+                    .fontSize(14).fontColor(this.isFollowing ? '#999' : Color.White)
+                    .backgroundColor(this.isFollowing ? '#F0F0F0' : '#4A90D9').borderRadius(20)
                     .height(34).padding({ left: 24, right: 24 })
-                    .onClick(() => { this.userVM.toggleFollow(this.userId); })
+                    .onClick(async () => {
+                      await this.userVM.toggleFollow(this.userId);
+                      // 同步刷新当前用户的关注列表和关注状态
+                      const store: MockDataStore = getStore();
+                      const cur: UserModel | undefined = store.users.find(u => u.id === this.currentUserId);
+                      if (cur) {
+                        this.isFollowing = cur.followedUserIds.includes(this.userId);
+                        AppStorage.setOrCreate('currentUser', cur);
+                      }
+                    })
                   Button('私信')
                     .fontSize(14).fontColor('#4A90D9')
                     .backgroundColor(Color.White).borderRadius(20)
@@ -129,6 +144,10 @@ export struct UserProfilePage {
                           url: 'pages/question/QuestionDetailPage',
                           params: { questionId: q.id }
                         });
+                      },
+                      onAuthorClick: (userId: string) => {
+                        AppStorage.setOrCreate('targetUserId', userId);
+                        router.pushUrl({ url: 'pages/user/UserProfilePage' });
                       }
                     }).margin({ left: 16, right: 16, top: 4, bottom: 4 })
                   }, (q: QuestionModel) => q.id)

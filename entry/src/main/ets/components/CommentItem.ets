@@ -3,11 +3,13 @@
  */
 import { CommentModel } from '../model/CommentModel';
 import { UserInfoBar } from './UserInfoBar';
+import { router } from '@kit.ArkUI';
 
 @Component
 export struct CommentItem {
   @ObjectLink comment: CommentModel;
   onLike?: (commentId: string) => void;
+  onAuthorClick?: (userId: string) => void;
 
   build() {
     Row() {
@@ -22,6 +24,11 @@ export struct CommentItem {
         .backgroundColor(this.getAvatarColor(this.comment.author.name))
         .textAlign(TextAlign.Center)
         .alignSelf(ItemAlign.Start)
+        .onClick(() => {
+          if (this.onAuthorClick && this.comment.author.id) {
+            this.onAuthorClick(this.comment.author.id);
+          }
+        })
 
       Column() {
         // 用户名 + 时间
@@ -29,7 +36,12 @@ export struct CommentItem {
           Text(this.comment.author.name || '匿名')
             .fontSize(13)
             .fontWeight(FontWeight.Medium)
-            .fontColor('#1A1A1A')
+            .fontColor('#4A90D9')
+            .onClick(() => {
+              if (this.onAuthorClick && this.comment.author.id) {
+                this.onAuthorClick(this.comment.author.id);
+              }
+            })
 
           if (this.comment.replyTo) {
             Text(' 回复 ')

@@ -185,7 +185,13 @@ export struct QuestionDetailPage {
                               ForEach(
                                 this.viewModel.commentMap.get(answer.id)!.getDataArray() as CommentModel[],
                                 (comment: CommentModel) => {
-                                  CommentItem({ comment: comment })
+                                  CommentItem({
+                                  comment: comment,
+                                  onAuthorClick: (uid: string) => {
+                                    AppStorage.setOrCreate('targetUserId', uid);
+                                    router.pushUrl({ url: 'pages/user/UserProfilePage' });
+                                  }
+                                })
                                 },
                                 (comment: CommentModel) => comment.id
                               )
