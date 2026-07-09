@@ -89,12 +89,173 @@ export class MockDataStore {
   }
 
   /**
+   * 首次使用 DB 为空时，写入种子用户和提问，每个话题至少 1 条
+   */
+  async seedInitialQuestions(): Promise<void> {
+    try {
+      // 先检查是否已有用户创建过问题
+      const existing: QuestionRow[] = await DatabaseHelper.queryAllQuestions();
+      if (existing.length > 0) { return; }
+
+      // 3 个种子作者
+      const seedUsers: UserRow[] = [
+        {
+          id: 'u_seed_1', phone: 'seed_1', username: '小明学长', password: '',
+          name: '小明学长', avatar: '', bio: '计算机科学与技术专业，热爱编程与分享',
+          college: '信息科学与技术学院', major: '计算机科学与技术', grade: '大三',
+          reputation: 520, acceptedCount: 18, totalAnswers: 45, totalQuestions: 8,
+          followerCount: 3, followingCount: 2,
+          followedTopicIds: '["t_6002","t_6005","t_6011"]', createdAt: '2025-09-01T08:00:00Z'
+        },
+        {
+          id: 'u_seed_2', phone: 'seed_2', username: '图书馆常驻选手', password: '',
+          name: '图书馆常驻选手', avatar: '', bio: '考研备考中，偶尔分享学习心得',
+          college: '数学科学学院', major: '数学与应用数学', grade: '大四',
+          reputation: 380, acceptedCount: 12, totalAnswers: 32, totalQuestions: 5,
+          followerCount: 2, followingCount: 1,
+          followedTopicIds: '["t_6000","t_6003","t_6012"]', createdAt: '2025-09-01T08:00:00Z'
+        },
+        {
+          id: 'u_seed_3', phone: 'seed_3', username: '校园树洞', password: '',
+          name: '校园树洞', avatar: '', bio: '匿名分享校园生活大小事',
+          college: '文学院', major: '汉语言文学', grade: '大三',
+          reputation: 710, acceptedCount: 25, totalAnswers: 58, totalQuestions: 12,
+          followerCount: 5, followingCount: 3,
+          followedTopicIds: '["t_6005","t_6007","t_6013","t_6014"]', createdAt: '2025-09-01T08:00:00Z'
+        }
+      ];
+      for (const u of seedUsers) {
+        await DatabaseHelper.insertUser(u);
+        this.syncUserFromDb(u);
+      }
+
+      // 种子提问：覆盖全部 20 个话题，模拟真实校园内容
+      const seedQuestions: Array<{title: string; content: string; topicIds: string[]; authorId: string; createdAt: string}> = [
+        // 高等数学 t_6000
+        { title: '可微与可导的区别到底是什么？', content: '高数课上说可微一定可导，但反过来成立吗？有没有反例可以直观理解？', topicIds: ['t_6000'], authorId: 'u_seed_2', createdAt: '2026-06-15T10:30:00Z' },
+        { title: '二重积分换元法有没有什么技巧？', content: '每次做二重积分换元，Jacobian公式就记混…求大神分享记忆方法', topicIds: ['t_6000','t_6012'], authorId: 'u_seed_1', createdAt: '2026-06-20T14:20:00Z' },
+        // 大学英语 t_6001
+        { title: '四级听力前5题总是听不懂怎么办？', content: '每次Section A的前5题都是听一遍就过了，完全跟不上节奏，有什么训练方法吗？', topicIds: ['t_6001'], authorId: 'u_seed_3', createdAt: '2026-06-18T09:15:00Z' },
+        { title: '六级作文模板求推荐', content: '12月考六级，作文一直是我的弱项，有没有靠谱的模板可以推荐？', topicIds: ['t_6001','t_6012'], authorId: 'u_seed_2', createdAt: '2026-07-02T16:45:00Z' },
+        // 程序设计 t_6002
+        { title: 'Java和Python选哪个入门比较好？', content: '大一新生，下学期要选编程课，纠结Java还是Python，综合来看哪个更适合零基础？', topicIds: ['t_6002'], authorId: 'u_seed_1', createdAt: '2026-06-25T11:10:00Z' },
+        { title: 'LeetCode刷题顺序推荐', content: '听说校招面试都要考算法，想开始刷LeetCode，该按什么顺序刷？easy->medium->hard还是按标签分类？', topicIds: ['t_6002'], authorId: 'u_seed_3', createdAt: '2026-07-01T20:30:00Z' },
+        // 考研交流 t_6003
+        { title: '考研数学跟张宇还是汤家凤？', content: '25考研，数学一。听说张宇偏难、汤家凤偏基础，有没有过来人给点建议？', topicIds: ['t_6003'], authorId: 'u_seed_2', createdAt: '2026-05-10T08:00:00Z' },
+        { title: '408专业课复习时间线', content: '跨考计算机，408四门课完全没学过，从现在开始还来得及吗？求复习规划', topicIds: ['t_6003','t_6002'], authorId: 'u_seed_1', createdAt: '2026-06-08T12:00:00Z' },
+        // 就业实习 t_6004
+        { title: '大一暑假能找到实习吗？', content: '才学了一学期编程，暑假想找实习积累经验，是不是太早了？有什么适合低年级的实习岗位推荐？', topicIds: ['t_6004'], authorId: 'u_seed_3', createdAt: '2026-06-22T15:30:00Z' },
+        { title: '互联网寒冬校招还有什么方向？', content: '感觉大厂都在裁员，25届校招是不是很难？除了互联网还有哪些行业值得投？', topicIds: ['t_6004','t_6011'], authorId: 'u_seed_1', createdAt: '2026-07-03T09:00:00Z' },
+        // 校园生活 t_6005
+        { title: '东区食堂哪家麻辣烫最好吃？', content: '新来的大一不太了解，求老生安利！东区食堂一楼的张记和二楼的川味哪个更值得排队？', topicIds: ['t_6005'], authorId: 'u_seed_3', createdAt: '2026-06-12T18:00:00Z' },
+        { title: '图书馆选座攻略', content: '每次去图书馆都找不到好位置，哪些区域是空调最舒适、声音最小的？分享几个冷门好座位', topicIds: ['t_6005'], authorId: 'u_seed_2', createdAt: '2026-07-05T07:30:00Z' },
+        // 恋爱情感 t_6006
+        { title: '大学谈恋爱真的影响学习吗？', content: '家长说大学谈恋爱会耽误学习，但我看周围情侣学习也不错，到底有没有影响？过来人说说', topicIds: ['t_6006'], authorId: 'u_seed_3', createdAt: '2026-06-28T21:00:00Z' },
+        // 新生专区 t_6007
+        { title: '宿舍必备物品清单求补充！', content: '马上报到了，已经准备的：床帘、台灯、插线板、晾衣架。还有什么宿舍必需品求补充！', topicIds: ['t_6007'], authorId: 'u_seed_3', createdAt: '2026-07-08T10:00:00Z' },
+        { title: '学校附近有什么好吃的？', content: '新生报到第三天，食堂吃腻了，求推荐学校周边性价比高的餐馆和小吃街', topicIds: ['t_6007','t_6005'], authorId: 'u_seed_1', createdAt: '2026-07-08T12:30:00Z' },
+        // 考试资料 t_6008
+        { title: '期末毛概重点有分享的吗？', content: '马上期末了，毛概还没复习完，有没有学长学姐整理的重点笔记？感激不尽！', topicIds: ['t_6008'], authorId: 'u_seed_2', createdAt: '2026-06-30T19:00:00Z' },
+        { title: '大物实验报告怎么写拿高分？', content: '每次实验报告都被批"缺少误差分析"，到底该怎么写？求模板参考', topicIds: ['t_6008'], authorId: 'u_seed_1', createdAt: '2026-07-04T14:00:00Z' },
+        // 科研学术 t_6009
+        { title: '本科生要不要进实验室？', content: '大二了，老师问要不要进他的实验室做项目，但担心影响课业，取舍之间怎么决策？', topicIds: ['t_6009'], authorId: 'u_seed_2', createdAt: '2026-06-10T16:00:00Z' },
+        // 留学申请 t_6010
+        { title: 'GPA 3.2 能申到美硕CS吗？', content: '想去美国读CS硕士，但GPA只有3.2，还有没有希望？哪些学校对GPA要求相对宽松？', topicIds: ['t_6010'], authorId: 'u_seed_3', createdAt: '2026-06-05T11:00:00Z' },
+        // 技术开发 t_6011
+        { title: '想学前端开发应该从哪里开始？', content: '完全零基础，想学前端开发，HTML/CSS/JS/Vue/React 这么多技术栈，应该按什么顺序学？', topicIds: ['t_6011'], authorId: 'u_seed_1', createdAt: '2026-06-19T13:00:00Z' },
+        { title: '鸿蒙开发有前途吗？', content: '学校开了HarmonyOS选修课，值得学吗？市场上对鸿蒙开发的需求怎么样？', topicIds: ['t_6011','t_6004'], authorId: 'u_seed_3', createdAt: '2026-07-06T10:30:00Z' },
+        // 二手交易 t_6012
+        { title: '出大物上下册教材，九五新', content: '上完大物课教材就没用了，九五新上下册一起出，价格好商量，有需要的联系', topicIds: ['t_6012'], authorId: 'u_seed_2', createdAt: '2026-07-01T17:00:00Z' },
+        // 社团活动 t_6013
+        { title: '街舞社招新什么时候开始？', content: '看到表演被圈粉了！街舞社这学期什么时候招新？零基础可以加入吗？', topicIds: ['t_6013'], authorId: 'u_seed_3', createdAt: '2026-07-07T15:00:00Z' },
+        // 心理健康 t_6014
+        { title: '期末压力大到失眠，怎么办？', content: '最近期末考试周，每天晚上脑子里都在想复习内容，翻来覆去睡不着。有什么缓解方法？', topicIds: ['t_6014'], authorId: 'u_seed_1', createdAt: '2026-07-04T23:00:00Z' },
+        // 体育运动 t_6015
+        { title: '羽毛球场地太难抢了！', content: '体育馆的羽毛球场地永远约不上，大家都是什么时候去抢的？有没有替代方案？', topicIds: ['t_6015'], authorId: 'u_seed_2', createdAt: '2026-06-27T16:30:00Z' },
+        // 设计创意 t_6016
+        { title: 'PS 有没有快速入门的方法？', content: '想做海报但完全不会Photoshop，网上教程太多看不完，有没有针对小白的快速入门路线？', topicIds: ['t_6016'], authorId: 'u_seed_3', createdAt: '2026-06-14T20:00:00Z' },
+        // 考证攻略 t_6017
+        { title: '计算机二级考C还是考Python？', content: '下学期想考计算机二级证书，办公类还是编程类比较好？C语言和Python哪个更好过？', topicIds: ['t_6017'], authorId: 'u_seed_1', createdAt: '2026-06-23T09:00:00Z' },
+        // 兼职信息 t_6018
+        { title: '校内勤工俭学岗位怎么申请？', content: '想在图书馆或行政楼找个勤工俭学的岗位，减轻家里负担，有人知道怎么申请吗？', topicIds: ['t_6018'], authorId: 'u_seed_3', createdAt: '2026-06-16T11:30:00Z' },
+        // 毕业论文 t_6019
+        { title: '毕业论文选题怎么选才不会踩坑？', content: '大四了要开始定毕设题目，怎么选才能既有研究价值又不至于做不出来？求导师视角的建议', topicIds: ['t_6019'], authorId: 'u_seed_2', createdAt: '2026-06-29T14:00:00Z' },
+      ];
+
+      for (const sq of seedQuestions) {
+        const q: QuestionModel = new QuestionModel();
+        q.id = this.genQuestionId();
+        q.title = sq.title;
+        q.content = sq.content;
+        q.topicIds = sq.topicIds;
+        q.status = QuestionStatus.OPEN;
+        q.viewCount = this.rand(30, 280);
+        q.likeCount = this.rand(2, 45);
+        q.followerCount = this.rand(1, 12);
+        q.answerCount = 0;
+        q.createdAt = sq.createdAt;
+        q.updatedAt = sq.createdAt;
+
+        const author: UserModel | undefined = this.users.find(u => u.id === sq.authorId);
+        if (author) {
+          q.author = author;
+          author.totalQuestions++;
+        }
+
+        // 插入 DB
+        await DatabaseHelper.insertQuestion({
+          id: q.id, title: q.title, content: q.content,
+          authorId: q.author.id, authorName: q.author.name, authorAvatar: q.author.avatar,
+          topicIds: JSON.stringify(q.topicIds), status: 'OPEN',
+          viewCount: q.viewCount, likeCount: q.likeCount, followerCount: q.followerCount,
+          answerCount: q.answerCount, createdAt: q.createdAt, updatedAt: q.updatedAt
+        });
+
+        // 入内存
+        this.questions.push(q);
+
+        // 更新话题问题数
+        for (const tid of sq.topicIds) {
+          const topic: TopicModel | undefined = this.topics.find(t => t.id === tid);
+          if (topic) { topic.questionCount++; }
+        }
+      }
+
+      // 持久化种子用户的提问计数
+      for (const su of seedUsers) {
+        const memUser: UserModel | undefined = this.users.find(u => u.id === su.id);
+        if (memUser) {
+          await DatabaseHelper.updateUser({
+            id: memUser.id, phone: memUser.id, username: memUser.name, password: '',
+            name: memUser.name, avatar: memUser.avatar, bio: memUser.bio,
+            college: memUser.college, major: memUser.major, grade: memUser.grade,
+            reputation: memUser.reputation, acceptedCount: memUser.acceptedCount,
+            totalAnswers: memUser.totalAnswers, totalQuestions: memUser.totalQuestions,
+            followerCount: memUser.followerCount, followingCount: memUser.followingCount,
+            followedTopicIds: JSON.stringify(memUser.followedTopicIds),
+            createdAt: memUser.createdAt
+          });
+        }
+      }
+    } catch (err) {
+      console.error('seedInitialQuestions failed:', JSON.stringify(err));
+    }
+  }
+
+  /**
    * 从 DB 加载问题和回答到内存 store（App 启动后调用一次）
    */
   async loadFromDb(): Promise<void> {
     if (this.dbLoaded) { return; }
     try {
       const dbQuestions: QuestionRow[] = await DatabaseHelper.queryAllQuestions();
+
+      // 首次使用 DB 为空，写入种子数据
+      if (dbQuestions.length === 0) {
+        await this.seedInitialQuestions();
+        this.dbLoaded = true;
+        return;
+      }
       for (const row of dbQuestions) {
         const q: QuestionModel = this.rowToQuestionModel(row);
         this.questions.push(q);
