@@ -3,10 +3,12 @@
  * 展示当前用户信息、问答统计、关注粉丝等
  */
 import { UserModel } from '../model/UserModel';
-import { QuestionModel } from '../model/QuestionModel';
+import { QuestionModel, QuestionStatus } from '../model/QuestionModel';
 import { AnswerModel } from '../model/AnswerModel';
 import { QuestionCard } from '../components/QuestionCard';
 import { UserViewModel } from '../viewmodel/UserViewModel';
+import { DatabaseHelper, QuestionRow, AnswerRow } from '../data/DatabaseHelper';
+import { TopicModel } from '../model/TopicModel';
 import { getStore } from '../mock/MockData';
 import { router } from '@kit.ArkUI';
 
@@ -14,10 +16,13 @@ import { router } from '@kit.ArkUI';
 export struct ProfilePage {
   @StorageLink('currentUser') currentUser: UserModel | null = null;
   @StorageLink('currentUserId') currentUserId: string = '';
+  @StorageLink('profileRefreshTrigger') profileRefreshTrigger: number = 0;
   private userVM: UserViewModel = UserViewModel.getInstance();
   @State activeTab: number = 0; // 0=提问, 1=回答
   @State myQuestions: QuestionModel[] = [];
   @State myAnswers: AnswerModel[] = [];
+  @State followedTopicCount: number = 0;
+  @State followedTopics: TopicModel[] = [];
 
   async aboutToAppear(): Promise<void> {
     await this.loadUserContent();
@@ -25,9 +30,60 @@ export struct ProfilePage {
 
   async loadUserContent(): Promise<void> {
     if (!this.currentUserId) { return; }
+    // 从数据库加载当前用户的提问和回答
+    const dbQuestions: QuestionRow[] = await DatabaseHelper.queryQuestionsByAuthor(this.currentUserId);
+    const dbAnswers: AnswerRow[] = await DatabaseHelper.queryAnswersByAuthor(this.currentUserId);
+
+    const questions: QuestionModel[] = [];
+    for (const row of dbQuestions) {
+      const q: QuestionModel = new QuestionModel();
+      q.id = row.id;
+      q.title = row.title;
+      q.content = row.content;
+      q.author = this.currentUser ? this.currentUser : new UserModel();
+      try {
+        const parsed: Object = JSON.parse(row.topicIds) as Object;
+        q.topicIds = parsed as string[];
+      } catch (_e) {
+        q.topicIds = [];
+      }
+      q.status = row.status === 'RESOLVED' ? QuestionStatus.RESOLVED : QuestionStatus.OPEN;
+      q.viewCount = row.viewCount;
+      q.likeCount = row.likeCount;
+      q.followerCount = row.followerCount;
+      q.answerCount = row.answerCount;
+      q.createdAt = row.createdAt;
+      q.updatedAt = row.updatedAt;
+      questions.push(q);
+    }
+
+    const answers: AnswerModel[] = [];
+    for (const row of dbAnswers) {
+      const a: AnswerModel = new AnswerModel();
+      a.id = row.id;
+      a.questionId = row.questionId;
+      a.content = row.content;
+      a.author = this.currentUser ? this.currentUser : new UserModel();
+      a.isAccepted = row.isAccepted === 1;
+      a.likeCount = row.likeCount;
+      a.commentCount = row.commentCount;
+      a.createdAt = row.createdAt;
+      answers.push(a);
+    }
+
+    this.myQuestions = questions;
+    this.myAnswers = answers;
+
+    // 加载关注的话题
     const store = getStore();
-    this.myQuestions = store.questions.filter(q => q.author.id === this.currentUserId);
-    this.myAnswers = store.answers.filter(a => a.author.id === this.currentUserId);
+    const user: UserModel | undefined = store.users.find(u => u.id === this.currentUserId);
+    if (user && user.followedTopicIds) {
+      this.followedTopicCount = user.followedTopicIds.length;
+      this.followedTopics = store.topics.filter(t => user.followedTopicIds.includes(t.id));
+    } else {
+      this.followedTopicCount = 0;
+      this.followedTopics = [];
+    }
   }
 
   build() {
@@ -63,8 +119,15 @@ export struct ProfilePage {
             // 统计数字
             Row() {
               this.StatColumn('声望', this.currentUser.reputation)
-              this.StatColumn('采纳率', `${this.currentUser.acceptanceRate}%`)
-              this.StatColumn('关注', this.currentUser.followingCount)
+              this.StatColumn('采纳率', '0%')
+              Column() {
+                Text(`${this.followedTopicCount}`)
+                  .fontSize(18).fontWeight(FontWeight.Bold).fontColor('#4A90D9')
+                Text('关注话题')
+                  .fontSize(12).fontColor('#999').margin({ top: 4 })
+              }
+              .alignItems(HorizontalAlign.Center)
+              .onClick(() => { this.showFollowedTopics(); })
               this.StatColumn('粉丝', this.currentUser.followerCount)
             }
             .width('100%').margin({ top: 16 })
@@ -144,8 +207,14 @@ export struct ProfilePage {
             }
           }
 
-          // 底部留白
-          Blank().height(40)
+          // 退出登录按钮
+          Button('退出登录')
+            .fontSize(15).fontColor('#E8634A')
+            .backgroundColor(Color.White)
+            .width('90%').height(44).borderRadius(22)
+            .border({ width: 1, color: '#E8634A', style: BorderStyle.Solid })
+            .margin({ top: 24, bottom: 40 })
+            .onClick(() => { this.handleLogout(); })
         }.width('100%')
       }
       .width('100%').height('100%').backgroundColor('#F5F6FA').scrollBar(BarState.Off)
@@ -161,8 +230,24 @@ export struct ProfilePage {
   }
 
   private getQuestionTitle(questionId: string): string {
+    const myQ: QuestionModel | undefined = this.myQuestions.find(q => q.id === questionId);
+    if (myQ) {
+      return myQ.title;
+    }
     const store = getStore();
-    const q = store.questions.find(q => q.id === questionId);
+    const q: QuestionModel | undefined = store.questions.find(q => q.id === questionId);
     return q ? q.title : '未知问题';
+  }
+
+  private handleLogout(): void {
+    this.userVM.logout();
+  }
+
+  /**
+   * 点击关注话题，跳转到话题广场查看已关注的话题
+   */
+  private showFollowedTopics(): void {
+    // 切换到话题广场 Tab（Tab 1）
+    AppStorage.setOrCreate('switchToTab', 1);
   }
 }

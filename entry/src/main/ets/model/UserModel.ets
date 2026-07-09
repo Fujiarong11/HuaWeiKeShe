@@ -23,10 +23,12 @@ export class UserModel {
 
   /** 采纳率 0-100 */
   get acceptanceRate(): number {
-    if (this.totalAnswers === 0) {
+    const total: number = this.totalAnswers || 0;
+    const accepted: number = this.acceptedCount || 0;
+    if (total === 0) {
       return 0;
     }
-    return Math.round((this.acceptedCount / this.totalAnswers) * 100);
+    return Math.round((accepted / total) * 100);
   }
 }
 

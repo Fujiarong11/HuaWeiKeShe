@@ -160,12 +160,14 @@ export struct PostQuestionPage {
       await postQuestion(this.title.trim(), this.content.trim(), this.selectedTopicIds, this.currentUserId);
       this.showSuccess = true;
       this.resetForm();
-      // 触发首页刷新
-      const currentTrigger = AppStorage.get<number>('homeRefreshTrigger') || 0;
-      AppStorage.setOrCreate('homeRefreshTrigger', currentTrigger + 1);
+      // 触发首页和我的页面刷新
+      const homeTrigger: number = AppStorage.get<number>('homeRefreshTrigger') || 0;
+      AppStorage.setOrCreate('homeRefreshTrigger', homeTrigger + 1);
+      const profileTrigger: number = AppStorage.get<number>('profileRefreshTrigger') || 0;
+      AppStorage.setOrCreate('profileRefreshTrigger', profileTrigger + 1);
       // 切换到首页 Tab
       AppStorage.setOrCreate('switchToTab', 0);
-      promptAction.showToast({ message: '发布成功！已显示在首页', duration: 2000 });
+      promptAction.showToast({ message: '发布成功！', duration: 2000 });
     } catch (e) {
       promptAction.showToast({ message: '发布失败，请重试', duration: 2000 });
     } finally {
