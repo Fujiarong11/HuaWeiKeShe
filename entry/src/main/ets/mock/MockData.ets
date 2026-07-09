@@ -11,6 +11,9 @@ import { AnswerModel } from '../model/AnswerModel';
 import { CommentModel, CommentTargetType } from '../model/CommentModel';
 import { TopicModel } from '../model/TopicModel';
 import { DatabaseHelper, QuestionRow, AnswerRow, UserRow } from '../data/DatabaseHelper';
+import * as QuestionApi from '../api/QuestionApi';
+import type { QuestionResponse } from '../api/QuestionApi';
+import type { ApiResult } from '../api/UserApi';
 
 // ============ 通知模型（内联定义）============
 
@@ -294,23 +297,43 @@ export class MockDataStore {
   async loadFromDb(): Promise<void> {
     if (this.dbLoaded) { return; }
     try {
-      const dbQuestions: QuestionRow[] = await DatabaseHelper.queryAllQuestions();
-
-      for (const row of dbQuestions) {
-        const q: QuestionModel = this.rowToQuestionModel(row);
-        this.questions.push(q);
+      // ====== 1. 从后端加载用户发布的问题 ======
+      const res: ApiResult = await QuestionApi.getQuestionList(1, 500);
+      if (res.code === 0 && res.data) {
+        const list: object[] = res.data as object[];
+        for (const item of list) {
+          const r: QuestionResponse = item as QuestionResponse;
+          // 避免与种子问题重复（按ID）
+          if (this.questions.find(q => q.id === String(r.id))) { continue; }
+          const q: QuestionModel = new QuestionModel();
+          q.id = String(r.id);
+          q.title = r.title;
+          q.content = r.content;
+          // 作者从内存 store 找，找不到就创建占位
+          const authorId: string = String(r.authorId);
+          const author: UserModel | undefined = this.users.find(u => u.id === authorId);
+          if (author) {
+            q.author = author;
+          } else {
+            const placeholder: UserModel = new UserModel();
+            placeholder.id = authorId;
+            placeholder.name = r.authorName || '';
+            placeholder.avatar = r.authorAvatar || '';
+            q.author = placeholder;
+          }
+          q.topicIds = r.topicIds || [];
+          q.status = r.status === 'RESOLVED' ? QuestionStatus.RESOLVED : QuestionStatus.OPEN;
+          q.viewCount = r.viewCount || 0;
+          q.likeCount = r.likeCount || 0;
+          q.followerCount = r.followerCount || 0;
+          q.answerCount = r.answerCount || 0;
+          q.createdAt = r.createdAt || '';
+          q.updatedAt = r.updatedAt || '';
+          this.questions.push(q);
+        }
       }
 
-      // 恢复问题 ID 计数器
-      if (dbQuestions.length > 0) {
-        const maxQId: number = Math.max(...dbQuestions.map(r => {
-          const parts: string[] = r.id.split('_');
-          return parseInt(parts.length > 1 ? parts[1] : '0');
-        }));
-        this.nextQuestionId = maxQId + 1;
-      }
-
-      // 加载所有回答
+      // ====== 2. 从本地 DB 加载回答（暂未迁移） ======
       for (const q of this.questions) {
         const dbAnswers: AnswerRow[] = await DatabaseHelper.queryAnswersByQuestionId(q.id);
         for (const row of dbAnswers) {
@@ -684,73 +707,47 @@ export class SearchAllResult {
 }
 
 export async function postQuestion(title: string, content: string, topicIds: string[], authorId: string): Promise<QuestionModel> {
-  await delay();
   const store: MockDataStore = getStore();
   const author: UserModel | undefined = store.users.find(u => u.id === authorId);
-  const question: QuestionModel = new QuestionModel();
-  question.id = store.genQuestionId();
-  question.title = title;
-  question.content = content;
-  question.author = author ? author : new UserModel();
-  question.topicIds = topicIds;
-  question.status = QuestionStatus.OPEN;
-  question.createdAt = new Date().toISOString();
-  question.updatedAt = question.createdAt;
-  store.questions.unshift(question);
+  const authorName: string = author ? author.name : '';
+  const authorAvatar: string = author ? author.avatar : '';
 
-  // 同步写入 DB
-  const questionRow: QuestionRow = {
-    id: question.id,
-    title: question.title,
-    content: question.content,
-    authorId: question.author.id,
-    authorName: question.author.name,
-    authorAvatar: question.author.avatar,
-    topicIds: JSON.stringify(question.topicIds),
-    status: 'OPEN',
-    viewCount: question.viewCount,
-    likeCount: question.likeCount,
-    followerCount: question.followerCount,
-    answerCount: question.answerCount,
-    createdAt: question.createdAt,
-    updatedAt: question.updatedAt
-  };
-  DatabaseHelper.insertQuestion(questionRow);
+  // 调用后端 API 写入 MySQL
+  const res: ApiResult = await QuestionApi.createQuestion(title, content, topicIds, authorId, authorName, authorAvatar);
 
-  // 更新话题的问题数量
-  for (const tid of topicIds) {
-    const topic: TopicModel | undefined = store.topics.find(t => t.id === tid);
-    if (topic) {
-      topic.questionCount++;
+  if (res.code === 0 && res.data) {
+    const resp: QuestionResponse = res.data as QuestionResponse;
+    const question: QuestionModel = new QuestionModel();
+    question.id = String(resp.id);
+    question.title = resp.title;
+    question.content = resp.content;
+    question.author = author ? author : new UserModel();
+    question.topicIds = resp.topicIds || topicIds;
+    question.status = QuestionStatus.OPEN;
+    question.viewCount = resp.viewCount || 0;
+    question.likeCount = resp.likeCount || 0;
+    question.followerCount = resp.followerCount || 0;
+    question.answerCount = resp.answerCount || 0;
+    question.createdAt = resp.createdAt || '';
+    question.updatedAt = resp.updatedAt || '';
+    store.questions.unshift(question);
+
+    // 更新话题的问题数量
+    for (const tid of topicIds) {
+      const topic: TopicModel | undefined = store.topics.find(t => t.id === tid);
+      if (topic) { topic.questionCount++; }
     }
+
+    // 更新内存中的用户提问数
+    if (author) { author.totalQuestions++; }
+
+    return question;
   }
 
-  // 更新用户提问数
-  if (author) {
-    author.totalQuestions++;
-    DatabaseHelper.updateUser({
-      id: author.id,
-      phone: author.id,
-      username: author.name,
-      password: '',
-      name: author.name,
-      avatar: author.avatar,
-      bio: author.bio,
-      college: author.college,
-      major: author.major,
-      grade: author.grade,
-      reputation: author.reputation,
-      acceptedCount: author.acceptedCount,
-      totalAnswers: author.totalAnswers,
-      totalQuestions: author.totalQuestions,
-      followerCount: author.followerCount,
-      followingCount: author.followingCount,
-      followedTopicIds: JSON.stringify(author.followedTopicIds),
-      createdAt: author.createdAt
-    });
-  }
-
-  return question;
+  // 后端失败则返回空问题
+  const fallback: QuestionModel = new QuestionModel();
+  fallback.id = '';
+  return fallback;
 }
 
 export async function toggleQuestionLike(questionId: string): Promise<QuestionModel | undefined> {
@@ -778,62 +775,39 @@ export async function toggleQuestionCollect(questionId: string): Promise<Questio
 // ========== 删除操作 ==========
 
 export async function deleteQuestion(questionId: string): Promise<boolean> {
-  await delay(100);
   const store: MockDataStore = getStore();
   const qIdx: number = store.questions.findIndex(q => q.id === questionId);
   if (qIdx < 0) { return false; }
   const question: QuestionModel = store.questions[qIdx];
+  const authorId: string = question.author.id;
 
-  const remaining: AnswerModel[] = [];
+  // 用户问题走后端删除
+  if (!questionId.startsWith('q_') && !questionId.startsWith('seed_q_')) {
+    await QuestionApi.deleteQuestion(questionId, authorId);
+  } else {
+    await DatabaseHelper.deleteAnswersByQuestionId(questionId);
+    await DatabaseHelper.deleteQuestion(questionId);
+  }
+
+  // 内存清理
+  const remainingA: AnswerModel[] = [];
   for (const a of store.answers) {
-    if (a.questionId !== questionId) {
-      remaining.push(a);
-    }
+    if (a.questionId !== questionId) { remainingA.push(a); }
   }
-  store.answers = remaining;
+  store.answers = remainingA;
 
-  const newQuestions: QuestionModel[] = [];
+  const remainingQ: QuestionModel[] = [];
   for (let i = 0; i < store.questions.length; i++) {
-    if (i !== qIdx) { newQuestions.push(store.questions[i]); }
+    if (i !== qIdx) { remainingQ.push(store.questions[i]); }
   }
-  store.questions = newQuestions;
+  store.questions = remainingQ;
 
-  const author: UserModel | undefined = store.users.find(u => u.id === question.author.id);
-  if (author && author.totalQuestions > 0) {
-    author.totalQuestions--;
-  }
+  const author: UserModel | undefined = store.users.find(u => u.id === authorId);
+  if (author && author.totalQuestions > 0) { author.totalQuestions--; }
 
   for (const tid of question.topicIds) {
     const topic: TopicModel | undefined = store.topics.find(t => t.id === tid);
-    if (topic && topic.questionCount > 0) {
-      topic.questionCount--;
-    }
-  }
-
-  await DatabaseHelper.deleteAnswersByQuestionId(questionId);
-  await DatabaseHelper.deleteQuestion(questionId);
-
-  if (author) {
-    DatabaseHelper.updateUser({
-      id: author.id,
-      phone: author.id,
-      username: author.name,
-      password: '',
-      name: author.name,
-      avatar: author.avatar,
-      bio: author.bio,
-      college: author.college,
-      major: author.major,
-      grade: author.grade,
-      reputation: author.reputation,
-      acceptedCount: author.acceptedCount,
-      totalAnswers: author.totalAnswers,
-      totalQuestions: author.totalQuestions,
-      followerCount: author.followerCount,
-      followingCount: author.followingCount,
-      followedTopicIds: JSON.stringify(author.followedTopicIds),
-      createdAt: author.createdAt
-    });
+    if (topic && topic.questionCount > 0) { topic.questionCount--; }
   }
 
   return true;

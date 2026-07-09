@@ -7,11 +7,13 @@ import { AnswerModel } from '../../model/AnswerModel';
 import { QuestionCard } from '../../components/QuestionCard';
 import { UserViewModel } from '../../viewmodel/UserViewModel';
 import { getStore, MockDataStore } from '../../mock/MockData';
+import * as UserApi from '../../api/UserApi';
+import type { ApiResult } from '../../api/UserApi';
 import { router } from '@kit.ArkUI';
 
 @Entry
 @Component
-export struct UserProfilePage {
+struct UserProfilePage {
   @StorageLink('targetUserId') userId: string = '';
   @StorageLink('currentUserId') currentUserId: string = '';
   @StorageLink('currentUser') currentUser: UserModel | null = null;
@@ -23,15 +25,15 @@ export struct UserProfilePage {
   async aboutToAppear(): Promise<void> {
     if (this.userId) {
       await this.userVM.loadUserProfile(this.userId);
-      // Also load questions and answers
       const store: MockDataStore = getStore();
       const questions: QuestionModel[] = store.questions.filter((q: QuestionModel): boolean => q.author.id === this.userId);
       const answers: AnswerModel[] = store.answers.filter((a: AnswerModel): boolean => a.author.id === this.userId);
       this.userVM.userQuestions.reloadData(questions);
       this.userVM.userAnswers.reloadData(answers);
-      // 检查是否已关注
-      if (this.currentUser) {
-        this.isFollowing = this.currentUser.followedUserIds.includes(this.userId);
+      // 从后端检查关注状态
+      if (this.currentUser && this.currentUser.id !== this.userId) {
+        const res: ApiResult = await UserApi.isFollowing(this.currentUser.id, this.userId);
+        this.isFollowing = res.code === 0 && String(res.data) === 'true';
       }
       this.dataVersion++;
     }
@@ -77,13 +79,7 @@ export struct UserProfilePage {
                     .height(34).padding({ left: 24, right: 24 })
                     .onClick(async () => {
                       await this.userVM.toggleFollow(this.userId);
-                      // 同步刷新当前用户的关注列表和关注状态
-                      const store: MockDataStore = getStore();
-                      const cur: UserModel | undefined = store.users.find(u => u.id === this.currentUserId);
-                      if (cur) {
-                        this.isFollowing = cur.followedUserIds.includes(this.userId);
-                        AppStorage.setOrCreate('currentUser', cur);
-                      }
+                      this.isFollowing = !this.isFollowing;
                     })
                   Button('私信')
                     .fontSize(14).fontColor('#4A90D9')

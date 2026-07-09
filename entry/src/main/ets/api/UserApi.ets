@@ -116,7 +116,44 @@ export async function userLogin(phone: string, password: string): Promise<ApiRes
   return httpPost('/api/user/login', body);
 }
 
+interface FollowBody {
+  followerId: number;
+  followedId: number;
+}
+
 /** 按手机号查用户 */
 export async function getUser(phone: string): Promise<ApiResult> {
   return httpGet('/api/user/getUser?phone=' + encodeURIComponent(phone));
+}
+
+/** 按ID查用户 */
+export async function getUserById(id: string): Promise<ApiResult> {
+  return httpGet('/api/user/getById?id=' + id);
+}
+
+/** 关注用户 */
+export async function followUser(followerId: string, followedId: string): Promise<ApiResult> {
+  const body: FollowBody = { followerId: parseInt(followerId), followedId: parseInt(followedId) };
+  return httpPost('/api/user/follow', body);
+}
+
+/** 取关用户 */
+export async function unfollowUser(followerId: string, followedId: string): Promise<ApiResult> {
+  const body: FollowBody = { followerId: parseInt(followerId), followedId: parseInt(followedId) };
+  return httpPost('/api/user/unfollow', body);
+}
+
+/** 检查是否已关注 */
+export async function isFollowing(followerId: string, followedId: string): Promise<ApiResult> {
+  return httpGet('/api/user/isFollowing?followerId=' + followerId + '&followedId=' + followedId);
+}
+
+/** 获取关注列表 */
+export async function getFollowingList(userId: string): Promise<ApiResult> {
+  return httpGet('/api/user/' + userId + '/following');
+}
+
+/** 获取粉丝列表 */
+export async function getFollowerList(userId: string): Promise<ApiResult> {
+  return httpGet('/api/user/' + userId + '/followers');
 }

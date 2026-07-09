@@ -14,7 +14,6 @@ import type { ApiResult, UserResponse } from '../api/UserApi';
 import { router } from '@kit.ArkUI';
 import {
   getUserById,
-  toggleFollowUser,
   getStore
 } from '../mock/MockData';
 
@@ -188,27 +187,85 @@ export class UserViewModel {
   }
 
   /**
-   * 关注/取关用户
+   * 关注/取关用户（走后端）
    */
   async toggleFollow(targetUserId: string): Promise<void> {
     if (!this.currentUser) { return; }
-    const updated = await toggleFollowUser(targetUserId, this.currentUser.id);
-    if (updated) {
-      this.viewingUser = updated;
+    // 先检查当前状态
+    const checkRes: ApiResult = await UserApi.isFollowing(this.currentUser.id, targetUserId);
+    const isFollowed: boolean = checkRes.code === 0 && String(checkRes.data) === 'true';
+
+    if (isFollowed) {
+      await UserApi.unfollowUser(this.currentUser.id, targetUserId);
+    } else {
+      await UserApi.followUser(this.currentUser.id, targetUserId);
+    }
+
+    // 刷新当前用户和查看用户的计数
+    await this.refreshUserCounts();
+  }
+
+  /**
+   * 加载关注/粉丝列表（走后端）
+   */
+  async loadFollowList(type: 'followers' | 'following', userId: string): Promise<void> {
+    const res: ApiResult = type === 'following'
+      ? await UserApi.getFollowingList(userId)
+      : await UserApi.getFollowerList(userId);
+
+    if (res.code === 0 && res.data) {
+      const list: object[] = res.data as object[];
+      const users: UserModel[] = [];
+      for (const item of list) {
+        const resp: UserResponse = item as UserResponse;
+        const u: UserModel = new UserModel();
+        u.id = String(resp.id);
+        u.phone = resp.phone || '';
+        u.name = resp.username || resp.name || '';
+        u.avatar = resp.avatar || '';
+        u.bio = resp.bio || '';
+        u.college = resp.college || '';
+        u.major = resp.major || '';
+        u.grade = resp.grade || '';
+        u.reputation = resp.reputation || 0;
+        u.acceptedCount = resp.acceptedCount || 0;
+        u.totalAnswers = resp.totalAnswers || 0;
+        u.totalQuestions = resp.totalQuestions || 0;
+        u.followerCount = resp.followerCount || 0;
+        u.followingCount = resp.followingCount || 0;
+        u.createdAt = resp.createdAt || '';
+        users.push(u);
+        // 同步到内存 store
+        getStore().syncUserFromModel(u);
+      }
+      this.userListDataSource.reloadData(users);
     }
   }
 
   /**
-   * 加载关注/粉丝列表
+   * 刷新用户关注计数
    */
-  async loadFollowList(type: 'followers' | 'following', userId: string): Promise<void> {
-    const store = getStore();
-    // 简化处理：返回内存 store 中的用户
-    const users: UserModel[] = [];
-    for (const u of store.users) {
-      if (u.id !== userId) { users.push(u); }
+  private async refreshUserCounts(): Promise<void> {
+    if (!this.currentUser) { return; }
+    // 从后端刷新当前用户数据
+    const res: ApiResult = await UserApi.getUserById(this.currentUser.id);
+    if (res.code === 0 && res.data) {
+      const resp: UserResponse = res.data as UserResponse;
+      this.currentUser.followerCount = resp.followerCount || 0;
+      this.currentUser.followingCount = resp.followingCount || 0;
+      AppStorage.setOrCreate('currentUser', this.currentUser);
+      getStore().syncUserFromModel(this.currentUser);
     }
-    this.userListDataSource.reloadData(users.slice(0, 15));
+    // 刷新查看中的用户
+    if (this.viewingUser) {
+      const vRes: ApiResult = await UserApi.getUserById(this.viewingUser.id);
+      if (vRes.code === 0 && vRes.data) {
+        const vResp: UserResponse = vRes.data as UserResponse;
+        this.viewingUser.followerCount = vResp.followerCount || 0;
+        this.viewingUser.followingCount = vResp.followingCount || 0;
+        getStore().syncUserFromModel(this.viewingUser);
+      }
+    }
   }
 
   /**
