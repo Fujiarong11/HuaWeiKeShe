@@ -10,7 +10,7 @@ import type { ApiResult } from './UserApi';
 interface CreateBody {
   title: string;
   content: string;
-  authorId: number;
+  authorId: string;
   authorName: string;
   authorAvatar: string;
   topicIds: string[];
@@ -106,7 +106,7 @@ export async function createQuestion(title: string, content: string, topicIds: s
   const body: CreateBody = {
     title: title,
     content: content,
-    authorId: parseInt(authorId),
+    authorId: authorId,
     authorName: authorName,
     authorAvatar: authorAvatar,
     topicIds: topicIds
@@ -132,4 +132,14 @@ export async function getUserQuestions(userId: string): Promise<ApiResult> {
 /** 删除问题 */
 export async function deleteQuestion(id: string, userId: string): Promise<ApiResult> {
   return httpDelete('/api/question/' + id + '?userId=' + userId);
+}
+
+/** 获取热门问题（按热度排序） */
+export async function getHotQuestions(page: number = 1, size: number = 20): Promise<ApiResult> {
+  return httpGet('/api/question/hot?page=' + page + '&size=' + size);
+}
+
+/** 获取推荐问题（按用户关注话题推荐） */
+export async function getRecommendedQuestions(userId: string, page: number = 1, size: number = 20): Promise<ApiResult> {
+  return httpGet('/api/question/recommend?userId=' + userId + '&page=' + page + '&size=' + size);
 }

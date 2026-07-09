@@ -7,6 +7,7 @@ import { TopicModel } from '../../model/TopicModel';
 import { QuestionCard } from '../../components/QuestionCard';
 import { LoadingFooter } from '../../components/LoadingFooter';
 import { EmptyPlaceholder } from '../../components/EmptyPlaceholder';
+import { ServiceCard } from '../../components/ServiceCard';
 import { HomeViewModel } from '../../viewmodel/HomeViewModel';
 import { HomeTabType } from '../../common/constants/CommonConstants';
 import { router } from '@kit.ArkUI';
@@ -104,6 +105,9 @@ export struct HomePage {
         .scrollable(ScrollDirection.Horizontal).scrollBar(BarState.Off)
         .width('100%').height(36)
       }
+
+      // 服务卡片：热门问题排行 + 邀请提醒
+      ServiceCard()
 
       // 下拉刷新 + 问题列表
       Refresh({ refreshing: $$this.isRefreshing }) {

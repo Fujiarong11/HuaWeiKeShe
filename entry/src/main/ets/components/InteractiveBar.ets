@@ -14,19 +14,20 @@ export struct InteractiveBar {
 
   build() {
     Row() {
-      // 点赞
+      // 点赞 — 红色爱心
       Row() {
         Text(this.isLiked ? '❤️' : '🤍')
-          .fontSize(18)
-        Text(`${this.likeCount}`)
+          .fontSize(20)
+        Text(this.isLiked ? `${this.likeCount}` : `${this.likeCount}`)
           .fontSize(14)
-          .fontColor(this.isLiked ? '#FF6B6B' : '#999')
-          .fontWeight(this.isLiked ? FontWeight.Medium : FontWeight.Normal)
+          .fontColor(this.isLiked ? '#E8634A' : '#999')
+          .fontWeight(this.isLiked ? FontWeight.Bold : FontWeight.Normal)
           .margin({ left: 4 })
       }
-      .padding({ left: 12, right: 16, top: 8, bottom: 8 })
-      .borderRadius(20)
+      .padding({ left: 14, right: 18, top: 10, bottom: 10 })
+      .borderRadius(22)
       .backgroundColor(this.isLiked ? '#FFF0F0' : '#F5F5F5')
+      .border({ width: this.isLiked ? 1 : 0, color: '#FFD0D0', style: BorderStyle.Solid })
       .margin({ right: 10 })
       .onClick(() => {
         if (this.onLikeClick) {
@@ -34,19 +35,20 @@ export struct InteractiveBar {
         }
       })
 
-      // 收藏
+      // 收藏 — 黄色星星
       Row() {
         Text(this.isCollected ? '⭐' : '☆')
-          .fontSize(18)
+          .fontSize(20)
         Text(this.isCollected ? '已收藏' : '收藏')
           .fontSize(14)
-          .fontColor(this.isCollected ? '#FFB800' : '#999')
-          .fontWeight(this.isCollected ? FontWeight.Medium : FontWeight.Normal)
+          .fontColor(this.isCollected ? '#F0AD4E' : '#999')
+          .fontWeight(this.isCollected ? FontWeight.Bold : FontWeight.Normal)
           .margin({ left: 4 })
       }
-      .padding({ left: 12, right: 16, top: 8, bottom: 8 })
-      .borderRadius(20)
+      .padding({ left: 14, right: 18, top: 10, bottom: 10 })
+      .borderRadius(22)
       .backgroundColor(this.isCollected ? '#FFF8E1' : '#F5F5F5')
+      .border({ width: this.isCollected ? 1 : 0, color: '#FFE082', style: BorderStyle.Solid })
       .margin({ right: 10 })
       .onClick(() => {
         if (this.onCollectClick) {
@@ -57,14 +59,14 @@ export struct InteractiveBar {
       // 评论
       Row() {
         Text('💬')
-          .fontSize(18)
+          .fontSize(20)
         Text(`${this.commentCount}`)
           .fontSize(14)
           .fontColor('#999')
           .margin({ left: 4 })
       }
-      .padding({ left: 12, right: 16, top: 8, bottom: 8 })
-      .borderRadius(20)
+      .padding({ left: 14, right: 18, top: 10, bottom: 10 })
+      .borderRadius(22)
       .backgroundColor('#F5F5F5')
       .onClick(() => {
         if (this.onCommentClick) {

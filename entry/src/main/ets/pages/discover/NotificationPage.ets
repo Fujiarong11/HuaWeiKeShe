@@ -3,7 +3,8 @@
  * 展示各类系统通知
  */
 import { NotificationItem } from '../../mock/MockData';
-import { getNotifications, markNotificationRead } from '../../mock/MockData';
+import * as NotificationApi from '../../api/NotificationApi';
+import type { NotificationResponse } from '../../api/NotificationApi';
 import { EmptyPlaceholder } from '../../components/EmptyPlaceholder';
 import { router } from '@kit.ArkUI';
 
@@ -19,7 +20,32 @@ export struct NotificationPage {
 
   async loadNotifications(): Promise<void> {
     if (this.currentUserId) {
-      this.notifications = await getNotifications(this.currentUserId);
+      try {
+        const res = await NotificationApi.getNotifications(this.currentUserId);
+        if (res.code === 0 && res.data) {
+          const list: object[] = res.data as object[];
+          const items: NotificationItem[] = [];
+          for (const item of list) {
+            const r: NotificationResponse = item as NotificationResponse;
+            const n: NotificationItem = new NotificationItem();
+            n.id = String(r.id);
+            n.type = r.type;
+            n.title = r.title;
+            n.content = r.content;
+            n.fromUserId = String(r.fromUserId || '');
+            n.fromUserName = r.fromUserName || '';
+            n.fromUserAvatar = r.fromUserAvatar || '';
+            n.targetQuestionId = String(r.targetQuestionId || '');
+            n.targetAnswerId = String(r.targetAnswerId || '');
+            n.isRead = r.isRead === 1;
+            n.createdAt = r.createdAt || '';
+            items.push(n);
+          }
+          this.notifications = items;
+        }
+      } catch (e) {
+        this.notifications = [];
+      }
     }
   }
 
@@ -100,7 +126,7 @@ export struct NotificationPage {
                 .width('100%').padding(14).backgroundColor(noti.isRead ? Color.White : '#FAFBFF').borderRadius(10)
                 .margin({ left: 16, right: 16, top: 4, bottom: 4 })
                 .onClick(() => {
-                  markNotificationRead(noti.id);
+                  NotificationApi.markRead(noti.id);
                   noti.isRead = true;
                   if (noti.targetQuestionId) {
                     router.pushUrl({

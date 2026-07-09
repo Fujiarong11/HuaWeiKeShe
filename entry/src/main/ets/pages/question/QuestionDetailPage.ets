@@ -25,20 +25,46 @@ export struct QuestionDetailPage {
   @State showAnswerInput: boolean = false;
   @State showCommentFor: string = '';
   @State dataVersion: number = 0;
+  @State isRefreshing: boolean = false;
+  // 直接管理点赞/收藏状态（确保 UI 即时响应）
+  @State likeCount: number = 0;
+  @State isLiked: boolean = false;
+  @State isCollected: boolean = false;
 
   async aboutToAppear(): Promise<void> {
-    // 优先从路由参数读取 questionId，兼容旧版 AppStorage 方式
+    await this.loadPageData();
+  }
+
+  private async onRefresh(): Promise<void> {
+    this.isRefreshing = true;
+    await this.loadPageData();
+    this.isRefreshing = false;
+  }
+
+  // 页面每次显示时刷新（从其他页面返回时自动更新）
+  onPageShow(): void {
+    if (this.questionId) {
+      this.loadPageData();
+    }
+  }
+
+  private async loadPageData(): Promise<void> {
     const params = router.getParams() as Record<string, Object>;
     if (params && params['questionId']) {
       this.questionId = params['questionId'] as string;
     } else {
-      // 兼容直接设置 AppStorage 的方式
       this.questionId = AppStorage.get<string>('targetQuestionId') || '';
     }
     if (this.questionId) {
       this.viewModel.clearData();
       await this.viewModel.loadQuestionDetail(this.questionId);
       await this.viewModel.loadAnswers(this.questionId);
+      // 同步互动状态到本地 @State
+      if (this.viewModel.currentQuestion) {
+        this.likeCount = this.viewModel.currentQuestion.likeCount;
+        this.isLiked = this.viewModel.currentQuestion.isLiked;
+        this.isCollected = this.viewModel.currentQuestion.isCollected;
+      }
       this.dataVersion++;
     }
   }
@@ -72,8 +98,9 @@ export struct QuestionDetailPage {
           }
           .width('100%').padding({ left: 16, right: 16, top: 8, bottom: 8 })
 
-          Scroll() {
-            Column() {
+          Refresh({ refreshing: $$this.isRefreshing }) {
+            Scroll() {
+              Column() {
               // 问题内容区
               Column() {
                 Text(this.viewModel.currentQuestion.title)
@@ -119,12 +146,21 @@ export struct QuestionDetailPage {
 
                 // 互动按钮
                 InteractiveBar({
-                  likeCount: this.viewModel.currentQuestion.likeCount,
+                  likeCount: this.likeCount,
                   commentCount: this.viewModel.currentQuestion.answerCount,
-                  isLiked: this.viewModel.currentQuestion.isLiked,
-                  isCollected: this.viewModel.currentQuestion.isCollected,
-                  onLikeClick: () => { this.viewModel.toggleQuestionLike(); },
-                  onCollectClick: () => { this.viewModel.toggleQuestionCollect(); },
+                  isLiked: this.isLiked,
+                  isCollected: this.isCollected,
+                  onLikeClick: () => {
+                    // 乐观更新：先改本地 @State，UI 立刻响应
+                    this.isLiked = !this.isLiked;
+                    this.likeCount += this.isLiked ? 1 : -1;
+                    // 异步同步到 ViewModel + 后端
+                    this.viewModel.toggleQuestionLike();
+                  },
+                  onCollectClick: () => {
+                    this.isCollected = !this.isCollected;
+                    this.viewModel.toggleQuestionCollect();
+                  },
                   onCommentClick: () => { this.showAnswerInput = !this.showAnswerInput; }
                 })
               }
@@ -230,8 +266,13 @@ export struct QuestionDetailPage {
               Blank().height(80)
             }.width('100%')
           }
-          .width('100%').layoutWeight(1).scrollBar(BarState.Off)
+          .width('100%').scrollBar(BarState.Off)
           .edgeEffect(EdgeEffect.Spring)
+          }
+          .layoutWeight(1)
+          .onRefreshing(() => {
+            this.onRefresh();
+          })
         }
         .width('100%').height('100%').backgroundColor('#F5F6FA')
 

@@ -6,9 +6,8 @@ import { QuestionModel } from '../../model/QuestionModel';
 import { AnswerModel } from '../../model/AnswerModel';
 import { QuestionCard } from '../../components/QuestionCard';
 import { UserViewModel } from '../../viewmodel/UserViewModel';
-import { getStore, MockDataStore } from '../../mock/MockData';
 import * as UserApi from '../../api/UserApi';
-import type { ApiResult } from '../../api/UserApi';
+import type { UserResponse } from '../../api/UserApi';
 import { router } from '@kit.ArkUI';
 
 @Entry
@@ -23,20 +22,18 @@ struct UserProfilePage {
   @State isFollowing: boolean = false;
 
   async aboutToAppear(): Promise<void> {
-    if (this.userId) {
-      await this.userVM.loadUserProfile(this.userId);
-      const store: MockDataStore = getStore();
-      const questions: QuestionModel[] = store.questions.filter((q: QuestionModel): boolean => q.author.id === this.userId);
-      const answers: AnswerModel[] = store.answers.filter((a: AnswerModel): boolean => a.author.id === this.userId);
-      this.userVM.userQuestions.reloadData(questions);
-      this.userVM.userAnswers.reloadData(answers);
-      // 从后端检查关注状态
-      if (this.currentUser && this.currentUser.id !== this.userId) {
-        const res: ApiResult = await UserApi.isFollowing(this.currentUser.id, this.userId);
-        this.isFollowing = res.code === 0 && String(res.data) === 'true';
-      }
-      this.dataVersion++;
+    // 直接读 AppStorage，避免 @StorageLink 时序问题
+    const targetId: string = (AppStorage.get('targetUserId') as string) || this.userId;
+    if (!targetId) { return; }
+    this.userId = targetId;
+
+    await this.userVM.loadUserProfile(targetId);
+    // 从后端检查关注状态
+    if (this.currentUser && this.currentUser.id !== targetId) {
+      const res = await UserApi.isFollowing(this.currentUser.id, targetId);
+      this.isFollowing = res.code === 0 && String(res.data) === 'true';
     }
+    this.dataVersion++;
   }
 
   build() {
@@ -78,8 +75,23 @@ struct UserProfilePage {
                     .backgroundColor(this.isFollowing ? '#F0F0F0' : '#4A90D9').borderRadius(20)
                     .height(34).padding({ left: 24, right: 24 })
                     .onClick(async () => {
-                      await this.userVM.toggleFollow(this.userId);
-                      this.isFollowing = !this.isFollowing;
+                      const ok: boolean = await this.userVM.toggleFollow(this.userId);
+                      if (ok) {
+                        // 从后端重新确认状态
+                        if (this.currentUser) {
+                          const res = await UserApi.isFollowing(this.currentUser.id, this.userId);
+                          this.isFollowing = res.code === 0 && String(res.data) === 'true';
+                        }
+                        // 刷新 viewingUser 的计数（后端数据）
+                        if (this.userVM.viewingUser) {
+                          const vRes = await UserApi.getUserById(this.userVM.viewingUser.id);
+                          if (vRes.code === 0 && vRes.data) {
+                            const vResp: UserResponse = vRes.data as UserResponse;
+                            this.userVM.viewingUser.followerCount = vResp.followerCount || 0;
+                            this.userVM.viewingUser.followingCount = vResp.followingCount || 0;
+                          }
+                        }
+                      }
                     })
                   Button('私信')
                     .fontSize(14).fontColor('#4A90D9')

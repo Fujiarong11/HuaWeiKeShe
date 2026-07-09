@@ -117,8 +117,8 @@ export async function userLogin(phone: string, password: string): Promise<ApiRes
 }
 
 interface FollowBody {
-  followerId: number;
-  followedId: number;
+  followerId: string;
+  followedId: string;
 }
 
 /** 按手机号查用户 */
@@ -133,13 +133,13 @@ export async function getUserById(id: string): Promise<ApiResult> {
 
 /** 关注用户 */
 export async function followUser(followerId: string, followedId: string): Promise<ApiResult> {
-  const body: FollowBody = { followerId: parseInt(followerId), followedId: parseInt(followedId) };
+  const body: FollowBody = { followerId: followerId, followedId: followedId };
   return httpPost('/api/user/follow', body);
 }
 
 /** 取关用户 */
 export async function unfollowUser(followerId: string, followedId: string): Promise<ApiResult> {
-  const body: FollowBody = { followerId: parseInt(followerId), followedId: parseInt(followedId) };
+  const body: FollowBody = { followerId: followerId, followedId: followedId };
   return httpPost('/api/user/unfollow', body);
 }
 

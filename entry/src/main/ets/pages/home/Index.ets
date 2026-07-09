@@ -9,7 +9,8 @@ import { NotificationPage } from '../discover/NotificationPage';
 import { ProfilePage } from '../user/ProfilePage';
 import { UserViewModel } from '../../viewmodel/UserViewModel';
 import { UserModel } from '../../model/UserModel';
-import { getUnreadNotificationCount, getStore } from '../../mock/MockData';
+import { getStore } from '../../mock/MockData';
+import * as NotificationApi from '../../api/NotificationApi';
 import { router } from '@kit.ArkUI';
 
 @Entry
@@ -33,17 +34,20 @@ struct Index {
       this.isLoggedIn = true;
       this.isCheckingAuth = false;
 
-      // 2. 从 DB 恢复问题和回答数据到内存 store
+      // 2. 同步当前用户到内存 store（先于加载问题，确保问题能找到author）
       const store = getStore();
-      await store.loadFromDb();
-
-      // 3. 同步当前用户到内存 store（用户数据来自后端，确保后续操作能找到 author）
       if (this.currentUser) {
         store.syncUserFromModel(this.currentUser as UserModel);
       }
 
-      // 加载未读通知数
-      this.unreadCount = await getUnreadNotificationCount(this.currentUserId);
+      // 3. 从后端加载问题数据到内存 store
+      await store.loadFromDb();
+
+      // 加载未读通知数（后端 API）
+      const countRes = await NotificationApi.getUnreadCount(this.currentUserId);
+      if (countRes.code === 0 && countRes.data !== undefined) {
+        this.unreadCount = countRes.data;
+      }
     } else {
       // 2. 未登录，跳转到登录页
       this.isCheckingAuth = false;
@@ -57,10 +61,12 @@ struct Index {
       this.currentIndex = this.switchToTab;
       AppStorage.setOrCreate('switchToTab', -1);
     }
-    // 每次显示页面时刷新未读通知数
+    // 每次显示页面时刷新未读通知数（后端 API）
     if (this.currentUserId) {
-      getUnreadNotificationCount(this.currentUserId).then((count: number) => {
-        this.unreadCount = count;
+      NotificationApi.getUnreadCount(this.currentUserId).then((res) => {
+        if (res.code === 0 && res.data !== undefined) {
+          this.unreadCount = res.data;
+        }
       });
     }
   }

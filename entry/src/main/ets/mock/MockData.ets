@@ -13,7 +13,8 @@ import { TopicModel } from '../model/TopicModel';
 import { DatabaseHelper, QuestionRow, AnswerRow, UserRow } from '../data/DatabaseHelper';
 import * as QuestionApi from '../api/QuestionApi';
 import type { QuestionResponse } from '../api/QuestionApi';
-import type { ApiResult } from '../api/UserApi';
+import * as UserApi from '../api/UserApi';
+import type { UserResponse } from '../api/UserApi';
 
 // ============ 通知模型（内联定义）============
 
@@ -100,6 +101,25 @@ export class MockDataStore {
     this.seedTopics();
     this.seedUsers();
     this.seedQuestions();
+    this.seedInvites();
+  }
+
+  private seedInvites(): void {
+    // 种子邀请数据：种子用户之间互相邀请回答问题
+    const inv1: InviteRecord = new InviteRecord();
+    inv1.id = this.genInviteId(); inv1.questionId = 'q_1'; inv1.fromUserId = 'u_seed_1';
+    inv1.toUserId = 'u_seed_3'; inv1.createdAt = '2026-07-08T10:00:00Z';
+    this.invites.push(inv1);
+
+    const inv2: InviteRecord = new InviteRecord();
+    inv2.id = this.genInviteId(); inv2.questionId = 'q_3'; inv2.fromUserId = 'u_seed_2';
+    inv2.toUserId = 'u_seed_3'; inv2.createdAt = '2026-07-08T14:30:00Z';
+    this.invites.push(inv2);
+
+    const inv3: InviteRecord = new InviteRecord();
+    inv3.id = this.genInviteId(); inv3.questionId = 'q_5'; inv3.fromUserId = 'u_seed_1';
+    inv3.toUserId = 'u_seed_3'; inv3.createdAt = '2026-07-09T08:15:00Z';
+    this.invites.push(inv3);
   }
 
   // ========== 种子用户（纯内存，不写 DB）==========
@@ -298,7 +318,7 @@ export class MockDataStore {
     if (this.dbLoaded) { return; }
     try {
       // ====== 1. 从后端加载用户发布的问题 ======
-      const res: ApiResult = await QuestionApi.getQuestionList(1, 500);
+      const res = await QuestionApi.getQuestionList(1, 500);
       if (res.code === 0 && res.data) {
         const list: object[] = res.data as object[];
         for (const item of list) {
@@ -320,6 +340,8 @@ export class MockDataStore {
             placeholder.name = r.authorName || '';
             placeholder.avatar = r.authorAvatar || '';
             q.author = placeholder;
+            // 将占位作者加入内存 store，避免后续点作者头像时查不到
+            this.users.push(placeholder);
           }
           q.topicIds = r.topicIds || [];
           q.status = r.status === 'RESOLVED' ? QuestionStatus.RESOLVED : QuestionStatus.OPEN;
@@ -638,9 +660,10 @@ export async function getHotQuestions(limit: number = 10): Promise<QuestionModel
   for (const q of store.questions) {
     sorted.push(q);
   }
+  // 按浏览量排名（浏览量为主要依据，回答数/点赞数为辅助）
   sorted.sort((a: QuestionModel, b: QuestionModel) =>
-    (b.likeCount * 1 + b.answerCount * 3 + b.viewCount * 0.5) -
-    (a.likeCount * 1 + a.answerCount * 3 + a.viewCount * 0.5)
+    (b.viewCount * 10 + b.answerCount * 5 + b.likeCount * 1) -
+    (a.viewCount * 10 + a.answerCount * 5 + a.likeCount * 1)
   );
   return sorted.slice(0, limit);
 }
@@ -713,7 +736,7 @@ export async function postQuestion(title: string, content: string, topicIds: str
   const authorAvatar: string = author ? author.avatar : '';
 
   // 调用后端 API 写入 MySQL
-  const res: ApiResult = await QuestionApi.createQuestion(title, content, topicIds, authorId, authorName, authorAvatar);
+  const res = await QuestionApi.createQuestion(title, content, topicIds, authorId, authorName, authorAvatar);
 
   if (res.code === 0 && res.data) {
     const resp: QuestionResponse = res.data as QuestionResponse;
@@ -1129,16 +1152,36 @@ export async function toggleTopicFollow(topicId: string, userId: string): Promis
 // ========== 用户相关 API ==========
 
 export async function getUserById(id: string): Promise<UserModel | undefined> {
-  await delay();
   const store: MockDataStore = getStore();
+  // 1. 先查内存 store（种子用户 u_seed_* 也在这里）
   const found: UserModel | undefined = store.users.find(u => u.id === id);
-  if (found) {
-    return found;
+  if (found) { return found; }
+  // 2. 种子用户 ID 不走后端（非数字 Long）
+  if (id.startsWith('u_seed_') || id.startsWith('seed_') || !/^\d+$/.test(id)) {
+    return undefined;
   }
-  // 内存中没有，尝试从 DB 查
-  const dbUser: UserRow | null = await DatabaseHelper.queryUserById(id);
-  if (dbUser) {
-    return store.syncUserFromDb(dbUser);
+  // 3. 内存没有，调后端 API
+  const res = await UserApi.getUserById(id);
+  if (res.code === 0 && res.data) {
+    const resp: UserResponse = res.data as UserResponse;
+    const u: UserModel = new UserModel();
+    u.id = String(resp.id);
+    u.phone = resp.phone || '';
+    u.name = resp.username || resp.name || '';
+    u.avatar = resp.avatar || '';
+    u.bio = resp.bio || '';
+    u.college = resp.college || '';
+    u.major = resp.major || '';
+    u.grade = resp.grade || '';
+    u.reputation = resp.reputation || 0;
+    u.acceptedCount = resp.acceptedCount || 0;
+    u.totalAnswers = resp.totalAnswers || 0;
+    u.totalQuestions = resp.totalQuestions || 0;
+    u.followerCount = resp.followerCount || 0;
+    u.followingCount = resp.followingCount || 0;
+    u.createdAt = resp.createdAt || '';
+    store.syncUserFromModel(u);
+    return u;
   }
   return undefined;
 }
@@ -1274,6 +1317,31 @@ export async function markNotificationRead(notificationId: string): Promise<void
   const store: MockDataStore = getStore();
   const noti: NotificationItem | undefined = store.notifications.find(n => n.id === notificationId);
   if (noti) { noti.isRead = true; }
+}
+
+// ========== 邀请相关 API ==========
+
+/** 获取发给某用户的待处理邀请数量 */
+export function getPendingInviteCount(userId: string): number {
+  const store: MockDataStore = getStore();
+  let count = 0;
+  for (const inv of store.invites) {
+    if (inv.toUserId === userId) { count++; }
+  }
+  return count;
+}
+
+/** 获取发给某用户的最新 N 条邀请 */
+export function getPendingInvitesForUser(userId: string, limit: number = 3): InviteRecord[] {
+  const store: MockDataStore = getStore();
+  const result: InviteRecord[] = [];
+  for (const inv of store.invites) {
+    if (inv.toUserId === userId) { result.push(inv); }
+  }
+  result.sort((a: InviteRecord, b: InviteRecord) =>
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  return result.slice(0, limit);
 }
 
 // ========== 相关问题 ==========

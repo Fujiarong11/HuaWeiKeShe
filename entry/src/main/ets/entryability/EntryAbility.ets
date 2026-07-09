@@ -72,7 +72,7 @@ export default class EntryAbility extends UIAbility {
   }
 
   /**
-   * 处理跨设备迁移传递的数据（平板端接收）
+   * 处理外部拉起（含服务卡片点击跳转）
    */
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onNewWant');

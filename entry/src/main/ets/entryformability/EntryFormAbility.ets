@@ -1,66 +1,89 @@
 /**
  * 服务卡片 FormExtensionAbility
- * 提供服务卡片的数据绑定和更新逻辑
+ * 桌面卡片：调后端 API 获取热门问题（按浏览量排名）
  */
-import { formBindingData, formInfo, formProvider, FormExtensionAbility } from '@kit.FormKit';
+import { formBindingData, formProvider, FormExtensionAbility } from '@kit.FormKit';
 import { Want } from '@kit.AbilityKit';
-import { getHotQuestions } from '../mock/MockData';
+import * as QuestionApi from '../api/QuestionApi';
+import type { QuestionResponse } from '../api/QuestionApi';
 
 export default class EntryFormAbility extends FormExtensionAbility {
-  /**
-   * 卡片创建时回调
-   */
   onAddForm(want: Want): formBindingData.FormBindingData {
-    const formData: Record<string, Object> = {
-      'title': '热门问题',
-      'question1': '加载中...',
-      'question2': '加载中...',
-      'question3': '加载中...',
-      'answerCount1': '0',
-      'answerCount2': '0',
-      'answerCount3': '0',
-      'updateTime': new Date().toLocaleTimeString()
+    const data: Record<string, Object> = {
+      'title': '🔥 热门问题',
+      'question1': '正在加载...', 'question2': '', 'question3': '',
+      'answerCount1': '', 'answerCount2': '', 'answerCount3': '',
+      'qid1': '', 'qid2': '', 'qid3': '',
+      'inviteTitle': '📩 邀请回答', 'inviteCount': '',
+      'updateTime': ''
     };
-
     const formId: string = want.parameters?.['ohos.extra.param.key.form_identity'] as string;
     if (formId) {
       this.loadAndUpdateForm(formId);
     }
-
-    return formBindingData.createFormBindingData(formData);
+    return formBindingData.createFormBindingData(data);
   }
 
   onUpdateForm(formId: string): void {
     this.loadAndUpdateForm(formId);
   }
 
-  onCastToNormalForm(formId: string): void {
-  }
-
-  onFormEvent(formId: string, message: string): void {
-  }
-
-  onRemoveForm(formId: string): void {
-  }
+  onCastToNormalForm(formId: string): void {}
+  onFormEvent(formId: string, message: string): void {}
+  onRemoveForm(formId: string): void {}
 
   private async loadAndUpdateForm(formId: string): Promise<void> {
     if (!formId) { return; }
     try {
-      const hotQuestions = await getHotQuestions(3);
-      const formData: Record<string, Object> = {
+      const res = await QuestionApi.getHotQuestions(1, 3);
+      const data: Record<string, Object> = {
         'title': '🔥 热门问题',
-        'question1': hotQuestions.length > 0 ? hotQuestions[0].title.substring(0, 30) : '暂无',
-        'question2': hotQuestions.length > 1 ? hotQuestions[1].title.substring(0, 30) : '暂无',
-        'question3': hotQuestions.length > 2 ? hotQuestions[2].title.substring(0, 30) : '暂无',
-        'answerCount1': hotQuestions.length > 0 ? `${hotQuestions[0].answerCount} 回答` : '',
-        'answerCount2': hotQuestions.length > 1 ? `${hotQuestions[1].answerCount} 回答` : '',
-        'answerCount3': hotQuestions.length > 2 ? `${hotQuestions[2].answerCount} 回答` : '',
+        'question1': '', 'question2': '', 'question3': '',
+        'answerCount1': '', 'answerCount2': '', 'answerCount3': '',
+        'qid1': '', 'qid2': '', 'qid3': '',
+        'inviteTitle': '📩 邀请回答', 'inviteCount': '查看详情',
         'updateTime': new Date().toLocaleTimeString()
       };
-      const bindingData = formBindingData.createFormBindingData(formData);
-      formProvider.updateForm(formId, bindingData);
-    } catch (e) {
-      // 更新失败，保持旧数据
+
+      if (res.code === 0 && res.data) {
+        const list: object[] = res.data as object[];
+        const items: QuestionResponse[] = [];
+        for (const item of list) {
+          items.push(item as QuestionResponse);
+        }
+        if (items.length > 0) {
+          data['question1'] = items[0].title.substring(0, 30);
+          data['answerCount1'] = `👁${items[0].viewCount} 💬${items[0].answerCount}`;
+          data['qid1'] = String(items[0].id);
+        }
+        if (items.length > 1) {
+          data['question2'] = items[1].title.substring(0, 30);
+          data['answerCount2'] = `👁${items[1].viewCount} 💬${items[1].answerCount}`;
+          data['qid2'] = String(items[1].id);
+        }
+        if (items.length > 2) {
+          data['question3'] = items[2].title.substring(0, 30);
+          data['answerCount3'] = `👁${items[2].viewCount} 💬${items[2].answerCount}`;
+          data['qid3'] = String(items[2].id);
+        }
+      } else {
+        data['question1'] = '请先启动后端服务';
+        data['question2'] = '然后登录应用发帖';
+        data['question3'] = '即可查看热门问题';
+      }
+
+      const binding = formBindingData.createFormBindingData(data);
+      formProvider.updateForm(formId, binding);
+    } catch (_e) {
+      const data: Record<string, Object> = {
+        'title': '🔥 热门问题',
+        'question1': '请先启动后端服务', 'question2': '', 'question3': '',
+        'qid1': '', 'qid2': '', 'qid3': '',
+        'answerCount1': '', 'answerCount2': '', 'answerCount3': '',
+        'inviteTitle': '📩 邀请回答', 'inviteCount': '',
+        'updateTime': new Date().toLocaleTimeString()
+      };
+      formProvider.updateForm(formId, formBindingData.createFormBindingData(data));
     }
   }
 }

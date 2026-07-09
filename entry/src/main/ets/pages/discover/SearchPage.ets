@@ -115,6 +115,15 @@ export struct SearchPage {
 
         Scroll() {
           Column() {
+            if (this.activeTab === 0 &&
+                this.questions.length === 0 && this.topics.length === 0 && this.users.length === 0) {
+              Column() {
+                Text('🔍').fontSize(48)
+                Text('没有找到相关内容').fontSize(16).fontColor('#999').margin({ top: 12 })
+              }
+              .width('100%').padding(60).alignItems(HorizontalAlign.Center)
+            }
+
             if (this.activeTab === 0 || this.activeTab === 1) {
               if (this.questions.length === 0 && this.activeTab === 1) {
                 EmptyPlaceholder({ icon: '🔍', title: '没有找到相关问题' })
@@ -157,7 +166,7 @@ export struct SearchPage {
                   .onClick(() => {
                     AppStorage.setOrCreate('searchKeyword', t.name);
                     this.topicId = t.id;
-                    this.activeTab = 0; // 切换到综合tab看问题结果
+                    this.activeTab = 0;
                     this.performSearch(t.name);
                   })
                 }, (t: TopicModel) => t.id)
@@ -191,7 +200,7 @@ export struct SearchPage {
               }
             }
           }.width('100%')
-        }.width('100%').layoutWeight(1).scrollBar(BarState.Off)
+        }.width('100%').scrollBar(BarState.Off)
       }
     }
     .width('100%').height('100%').backgroundColor('#F5F6FA')

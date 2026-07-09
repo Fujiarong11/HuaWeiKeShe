@@ -1,14 +1,17 @@
 /**
  * 关注/粉丝列表页面
  * 根据 mode 参数显示"我关注的用户"或"关注我的用户"
+ * 数据走后端 API，本地内存仅作降级兜底
  */
 import { UserModel } from '../model/UserModel';
+import * as UserApi from '../api/UserApi';
+import type { UserResponse } from '../api/UserApi';
+import { UserViewModel } from '../viewmodel/UserViewModel';
 import {
   getFollowingUsers,
   getFollowerUsers,
   toggleFollowUser,
-  isFollowingUser,
-  getStore
+  isFollowingUser
 } from '../mock/MockData';
 import { router } from '@kit.ArkUI';
 
@@ -18,10 +21,12 @@ export struct FollowListPage {
   @State mode: string = 'following'; // 'following' | 'followers'
   @State userId: string = '';
   @StorageLink('currentUserId') currentUserId: string = '';
+  @StorageLink('currentUser') currentUser: UserModel | null = null;
   @State users: UserModel[] = [];
   @State isLoading: boolean = true;
   @State title: string = '';
   @State followingMap: Map<string, boolean> = new Map();
+  private userVM: UserViewModel = UserViewModel.getInstance();
 
   async aboutToAppear(): Promise<void> {
     // 从路由参数获取 mode 和 userId
@@ -43,6 +48,76 @@ export struct FollowListPage {
   async loadUsers(): Promise<void> {
     this.isLoading = true;
     try {
+      // 优先走后端 API
+      const isSeedUser = this.userId.startsWith('u_seed_') || this.userId.startsWith('seed_');
+      const useBackend = /^\d+$/.test(this.userId) && !isSeedUser;
+
+      if (useBackend) {
+        const res = this.mode === 'following'
+          ? await UserApi.getFollowingList(this.userId)
+          : await UserApi.getFollowerList(this.userId);
+
+        if (res.code === 0 && res.data) {
+          const list: object[] = res.data as object[];
+          const userList: UserModel[] = [];
+          for (const item of list) {
+            const resp: UserResponse = item as UserResponse;
+            const u: UserModel = new UserModel();
+            u.id = String(resp.id);
+            u.phone = resp.phone || '';
+            u.name = resp.username || resp.name || '';
+            u.avatar = resp.avatar || '';
+            u.bio = resp.bio || '';
+            u.college = resp.college || '';
+            u.major = resp.major || '';
+            u.grade = resp.grade || '';
+            u.reputation = resp.reputation || 0;
+            u.acceptedCount = resp.acceptedCount || 0;
+            u.totalAnswers = resp.totalAnswers || 0;
+            u.totalQuestions = resp.totalQuestions || 0;
+            u.followerCount = resp.followerCount || 0;
+            u.followingCount = resp.followingCount || 0;
+            u.createdAt = resp.createdAt || '';
+            userList.push(u);
+          }
+          this.users = userList;
+          console.info(`[FollowListPage] 后端返回 ${userList.length} 个用户, mode=${this.mode}`);
+
+          // 检查每个用户的关注状态（粉丝列表需要检查是否互相关注）
+          if (this.currentUserId) {
+            for (const u of this.users) {
+              if (u.id !== this.currentUserId) {
+                // 关注列表里的都是已关注的；粉丝列表需要查是否已互关
+                if (this.mode === 'following') {
+                  this.followingMap.set(u.id, true);
+                } else {
+                  const followRes = await UserApi.isFollowing(this.currentUserId, u.id);
+                  const isFollowed: boolean = followRes.code === 0 && String(followRes.data) === 'true';
+                  this.followingMap.set(u.id, isFollowed);
+                }
+              }
+            }
+          }
+        } else {
+          // 后端返回异常，打印日志并降级到本地内存
+          console.error(`[FollowListPage] 后端API异常: code=${res.code}, msg=${res.msg}, userId=${this.userId}, mode=${this.mode}`);
+          await this.loadFromLocalMemory();
+        }
+      } else {
+        // 种子用户，走本地内存
+        console.info(`[FollowListPage] 种子用户走本地内存: userId=${this.userId}, isSeedUser=${isSeedUser}`);
+        await this.loadFromLocalMemory();
+      }
+    } catch (e) {
+      console.error(`[FollowListPage] 网络异常: ${e}, userId=${this.userId}, mode=${this.mode}`);
+      await this.loadFromLocalMemory();
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  private async loadFromLocalMemory(): Promise<void> {
+    try {
       if (this.mode === 'following') {
         this.users = await getFollowingUsers(this.userId);
       } else {
@@ -57,10 +132,8 @@ export struct FollowListPage {
           }
         }
       }
-    } catch (e) {
+    } catch (_e) {
       this.users = [];
-    } finally {
-      this.isLoading = false;
     }
   }
 
@@ -193,14 +266,18 @@ export struct FollowListPage {
             style: BorderStyle.Solid
           })
           .onClick(async () => {
-            await toggleFollowUser(user.id, this.currentUserId);
-            const isNowFollowing = !this.followingMap.get(user.id);
-            this.followingMap.set(user.id, isNowFollowing);
-            // 刷新 currentUser 以同步关注数到"我的"页
-            const store = getStore();
-            const refreshed = store.users.find(u => u.id === this.currentUserId);
-            if (refreshed) {
-              AppStorage.setOrCreate('currentUser', refreshed);
+            const wasFollowing = this.followingMap.get(user.id) ?? false;
+            // 纯后端操作
+            const isRealUser = /^\d+$/.test(user.id) && /^\d+$/.test(this.currentUserId);
+            if (isRealUser) {
+              const ok: boolean = await this.userVM.toggleFollow(user.id);
+              if (ok) {
+                this.followingMap.set(user.id, !wasFollowing);
+              }
+            } else {
+              // 种子用户走本地内存
+              await toggleFollowUser(user.id, this.currentUserId);
+              this.followingMap.set(user.id, !wasFollowing);
             }
           })
       } else {

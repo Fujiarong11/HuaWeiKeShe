@@ -16,16 +16,17 @@ export struct AnswerCard {
 
   build() {
     Column() {
-      // 采纳标记
+      // 采纳标记（已采纳时顶部绿色提示可点击取消）
       if (this.answer.isAccepted) {
         Row() {
-          Text('✓ 最佳答案')
+          Text('✓ 已采纳为最佳答案')
             .fontSize(12)
             .fontColor('#FFFFFF')
             .fontWeight(FontWeight.Bold)
             .backgroundColor('#5CB85C')
-            .borderRadius(4)
-            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+            .borderRadius(6)
+            .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+          Blank()
         }
         .width('100%')
         .margin({ bottom: 10 })
@@ -39,22 +40,7 @@ export struct AnswerCard {
           showReputation: true,
           showTime: this.answer.formattedTime
         })
-
-        // 采纳按钮（仅问题作者可见）
-        if (this.isQuestionAuthor && !this.answer.isAccepted) {
-          Text('采纳')
-            .fontSize(12)
-            .fontColor('#5CB85C')
-            .fontWeight(FontWeight.Medium)
-            .border({ width: 1, color: '#5CB85C', style: BorderStyle.Solid })
-            .borderRadius(14)
-            .padding({ left: 12, right: 12, top: 4, bottom: 4 })
-            .onClick(() => {
-              if (this.onAccept) {
-                this.onAccept(this.answer.id);
-              }
-            })
-        }
+        Blank()
       }
       .width('100%')
       .onClick(() => {
@@ -62,6 +48,39 @@ export struct AnswerCard {
           this.onAuthorClick(this.answer.author.id);
         }
       })
+
+      // 采纳按钮（仅问题作者可见，未采纳灰边框 / 已采纳绿实心，均可点击切换）
+      if (this.isQuestionAuthor) {
+        Row() {
+          Text(this.answer.isAccepted ? '✓' : '✓')
+            .fontSize(13)
+            .fontColor(this.answer.isAccepted ? Color.White : '#5CB85C')
+            .fontWeight(FontWeight.Bold)
+          Text(this.answer.isAccepted ? ' 已采纳' : ' 采纳为最佳答案')
+            .fontSize(12)
+            .fontColor(this.answer.isAccepted ? Color.White : '#5CB85C')
+            .fontWeight(FontWeight.Medium)
+        }
+        .backgroundColor(this.answer.isAccepted ? '#5CB85C' : 'transparent')
+        .border({
+          width: 1,
+          color: '#5CB85C',
+          style: BorderStyle.Solid
+        })
+        .borderRadius(16)
+        .height(32)
+        .padding({ left: 14, right: 14 })
+        .shadow(this.answer.isAccepted
+          ? { radius: 4, color: 'rgba(92,184,92,0.3)', offsetY: 2 }
+          : { radius: 0, color: 'transparent', offsetY: 0 })
+        .alignSelf(ItemAlign.Start)
+        .margin({ top: 8 })
+        .onClick(() => {
+          if (this.onAccept) {
+            this.onAccept(this.answer.id);
+          }
+        })
+      }
 
       // 回答内容
       Text(this.answer.content)
@@ -76,13 +95,17 @@ export struct AnswerCard {
       Row() {
         // 点赞
         Row() {
-          Text(this.answer.isLiked ? '👍' : '👍')
-            .fontSize(14)
+          Text(this.answer.isLiked ? '❤️' : '🤍')
+            .fontSize(16)
           Text(`${this.answer.likeCount}`)
             .fontSize(13)
             .fontColor(this.answer.isLiked ? '#FF6B6B' : '#999')
+            .fontWeight(this.answer.isLiked ? FontWeight.Medium : FontWeight.Normal)
             .margin({ left: 4 })
         }
+        .padding({ left: 8, right: 12, top: 6, bottom: 6 })
+        .borderRadius(16)
+        .backgroundColor(this.answer.isLiked ? '#FFF0F0' : '#F5F5F5')
         .onClick(() => {
           if (this.onLike) {
             this.onLike(this.answer.id);

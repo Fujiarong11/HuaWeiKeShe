@@ -5,7 +5,7 @@
 import { preferences } from '@kit.ArkData';
 import { UserModel, LoginResult, RegisterResult } from '../model/UserModel';
 import * as UserApi from '../api/UserApi';
-import type { ApiResult, UserResponse } from '../api/UserApi';
+import type { UserResponse } from '../api/UserApi';
 
 const PREF_NAME = 'auth_preferences';
 const KEY_USER_ID = 'auth_user_id';
@@ -81,7 +81,7 @@ export class AuthService {
     if (err) { return { success: false, error: err }; }
 
     try {
-      const res: ApiResult = await UserApi.userRegister(phone.trim(), username.trim(), password);
+      const res = await UserApi.userRegister(phone.trim(), username.trim(), password);
 
       if (res.code === 0 && res.data) {
         const resp: UserResponse = res.data as UserResponse;
@@ -104,7 +104,7 @@ export class AuthService {
     if (err) { return { success: false, error: err }; }
 
     try {
-      const res: ApiResult = await UserApi.userLogin(phone.trim(), password);
+      const res = await UserApi.userLogin(phone.trim(), password);
 
       if (res.code === 0 && res.data) {
         const resp: UserResponse = res.data as UserResponse;
