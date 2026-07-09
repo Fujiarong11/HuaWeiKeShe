@@ -8,7 +8,8 @@ import { PostQuestionPage } from './PostQuestionPage';
 import { NotificationPage } from './NotificationPage';
 import { ProfilePage } from './ProfilePage';
 import { UserViewModel } from '../viewmodel/UserViewModel';
-import { getUnreadNotificationCount } from '../mock/MockData';
+import { getUnreadNotificationCount, getStore } from '../mock/MockData';
+import { DatabaseHelper, UserRow } from '../data/DatabaseHelper';
 import { router } from '@kit.ArkUI';
 
 @Entry
@@ -25,12 +26,23 @@ struct Index {
 
   async aboutToAppear(): Promise<void> {
     // 1. 先尝试从本地恢复登录状态
-    const restored = await this.userVM.tryRestoreSession();
+    const restored: boolean = await this.userVM.tryRestoreSession();
 
     if (restored && this.currentUserId) {
       // 恢复成功，直接进入首页
       this.isLoggedIn = true;
       this.isCheckingAuth = false;
+
+      // 2. 从 DB 恢复问题和回答数据到内存 store
+      const store = getStore();
+      await store.loadFromDb();
+
+      // 3. 同步当前用户到内存 store（确保后续操作能找到 author）
+      const dbUser: UserRow | null = await DatabaseHelper.queryUserById(this.currentUserId);
+      if (dbUser) {
+        store.syncUserFromDb(dbUser);
+      }
+
       // 加载未读通知数
       this.unreadCount = await getUnreadNotificationCount(this.currentUserId);
     } else {
@@ -115,6 +127,11 @@ struct Index {
       .animationDuration(200)
       .onChange((index: number) => {
         this.currentIndex = index;
+        // 切换到"我的"页面时触发刷新
+        if (index === 4) {
+          const currentTrigger: number = AppStorage.get<number>('profileRefreshTrigger') || 0;
+          AppStorage.setOrCreate('profileRefreshTrigger', currentTrigger + 1);
+        }
       })
       .width('100%')
       .height('100%')

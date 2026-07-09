@@ -3,10 +3,11 @@
  * 处理用户登录、注册、个人主页、关注粉丝等逻辑
  */
 import { UserModel } from '../model/UserModel';
-import { QuestionModel } from '../model/QuestionModel';
+import { QuestionModel, QuestionStatus } from '../model/QuestionModel';
 import { AnswerModel } from '../model/AnswerModel';
 import { BasicDataSource } from '../common/datasource/BasicDataSource';
 import { AuthService } from '../services/AuthService';
+import { DatabaseHelper, UserRow, QuestionRow, AnswerRow } from '../data/DatabaseHelper';
 import { router } from '@kit.ArkUI';
 import {
   getUserById,
@@ -53,6 +54,8 @@ export class UserViewModel {
         // 同步到 AppStorage
         AppStorage.setOrCreate('currentUser', result.user);
         AppStorage.setOrCreate('currentUserId', result.user.id);
+        // 同步用户到内存 store
+        this.syncUserToStore(result.user);
         return result.user;
       }
       return null;
@@ -76,6 +79,8 @@ export class UserViewModel {
         // 同步到 AppStorage
         AppStorage.setOrCreate('currentUser', result.user);
         AppStorage.setOrCreate('currentUserId', result.user.id);
+        // 同步用户到内存 store
+        this.syncUserToStore(result.user);
         return result.user;
       }
       return null;
@@ -120,18 +125,55 @@ export class UserViewModel {
   }
 
   /**
-   * 加载用户主页
+   * 加载用户主页（他人或自己）
    */
   async loadUserProfile(userId: string): Promise<void> {
     this.isLoading = true;
     try {
-      const user = await getUserById(userId);
+      const user: UserModel | undefined = await getUserById(userId);
       if (user) {
         this.viewingUser = user;
-        // 加载该用户的问题和回答
-        const store = getStore();
-        const questions = store.questions.filter(q => q.author.id === userId);
-        const answers = store.answers.filter(a => a.author.id === userId);
+        // 从 DB 加载该用户的提问和回答
+        const dbQuestions: QuestionRow[] = await DatabaseHelper.queryQuestionsByAuthor(userId);
+        const dbAnswers: AnswerRow[] = await DatabaseHelper.queryAnswersByAuthor(userId);
+
+        const questions: QuestionModel[] = [];
+        for (const row of dbQuestions) {
+          const q: QuestionModel = new QuestionModel();
+          q.id = row.id;
+          q.title = row.title;
+          q.content = row.content;
+          q.author = user;
+          try {
+            const parsed: Object = JSON.parse(row.topicIds) as Object;
+            q.topicIds = parsed as string[];
+          } catch (_e) {
+            q.topicIds = [];
+          }
+          q.status = row.status === 'RESOLVED' ? QuestionStatus.RESOLVED : QuestionStatus.OPEN;
+          q.viewCount = row.viewCount;
+          q.likeCount = row.likeCount;
+          q.followerCount = row.followerCount;
+          q.answerCount = row.answerCount;
+          q.createdAt = row.createdAt;
+          q.updatedAt = row.updatedAt;
+          questions.push(q);
+        }
+
+        const answers: AnswerModel[] = [];
+        for (const row of dbAnswers) {
+          const a: AnswerModel = new AnswerModel();
+          a.id = row.id;
+          a.questionId = row.questionId;
+          a.content = row.content;
+          a.author = user;
+          a.isAccepted = row.isAccepted === 1;
+          a.likeCount = row.likeCount;
+          a.commentCount = row.commentCount;
+          a.createdAt = row.createdAt;
+          answers.push(a);
+        }
+
         this.userQuestions.reloadData(questions);
         this.userAnswers.reloadData(answers);
       }
@@ -158,9 +200,12 @@ export class UserViewModel {
    */
   async loadFollowList(type: 'followers' | 'following', userId: string): Promise<void> {
     const store = getStore();
-    // 简化处理：随机返回一些用户
-    const users = store.users.filter(u => u.id !== userId).slice(0, 15);
-    this.userListDataSource.reloadData(users);
+    // 简化处理：返回内存 store 中的用户
+    const users: UserModel[] = [];
+    for (const u of store.users) {
+      if (u.id !== userId) { users.push(u); }
+    }
+    this.userListDataSource.reloadData(users.slice(0, 15));
   }
 
   /**
@@ -174,5 +219,16 @@ export class UserViewModel {
     this.currentUser.college = fields.college || this.currentUser.college;
     this.currentUser.major = fields.major || this.currentUser.major;
     AppStorage.setOrCreate('currentUser', this.currentUser);
+  }
+
+  /**
+   * 将用户同步到内存 store，确保后续发帖/回答能找到 author
+   */
+  private syncUserToStore(user: UserModel): void {
+    const store = getStore();
+    const existing: UserModel | undefined = store.users.find(u => u.id === user.id);
+    if (!existing) {
+      store.users.push(user);
+    }
   }
 }

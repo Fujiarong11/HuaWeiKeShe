@@ -1,115 +1,57 @@
 /**
- * 后端 HTTP API
- * 用 HTTP 请求替代本地 RelationalStore，对接 Spring Boot 后端
+ * 本地数据库 API
+ * 使用 HarmonyOS RelationalStore 替代 CloudBase 云函数
  *
- * 后端接口：
- *   POST /api/user/register   — 注册
- *   POST /api/user/login       — 登录
- *   GET  /api/user/getUser     — 查用户
+ * 当前已实现本地版本：
+ *   userRegister    - 注册用户（写入本地数据库）
+ *   getUser         - 查询用户（按手机号查本地数据库）
  *
- *  其余 API（发帖、回答、评论等）仍为占位，后续接入。
+ * 其余 API（发帖、回答、评论等）仍为占位，后续可接入后端。
  */
-import { http } from '@kit.NetworkKit';
-import { ApiConfig } from './ApiConfig';
+import { DatabaseHelper } from '../data/DatabaseHelper';
+import type { UserRow } from '../data/DatabaseHelper';
 
 /**
- * API 通用返回结构（与后端 ApiResult 对应）
+ * API 通用返回结构（与旧 CloudBase 接口兼容）
  */
-export interface ApiResult {
+interface ApiResult {
   code: number;
   msg?: string;
   data?: object;
 }
 
 // ============================================================
-// 用户相关 API（已接后端 HTTP）
+// 用户相关 API（已接本地数据库）
 // ============================================================
 
 /**
- * 注册请求数据结构
- */
-export interface RegisterRequest {
-  phone: string;
-  username: string;
-  password: string;
-}
-
-/**
- * 登录请求数据结构
- */
-export interface LoginRequest {
-  phone: string;
-  password: string;
-}
-
-/**
  * 注册新用户
- * POST /api/user/register
  */
-export async function userRegister(userData: RegisterRequest): Promise<ApiResult> {
+export async function userRegister(userData: object): Promise<ApiResult> {
   try {
-    const request = http.createHttp();
-    const response = await request.request(
-      `${ApiConfig.BASE_URL}/api/user/register`,
-      {
-        method: http.RequestMethod.POST,
-        header: { 'Content-Type': 'application/json' },
-        extraData: JSON.stringify(userData),
-        connectTimeout: 10000,
-        readTimeout: 10000
-      }
-    );
-    request.destroy();
-    return parseResponse(response);
+    const row: UserRow = userData as UserRow;
+    const rowId: number = await DatabaseHelper.insertUser(row);
+    if (rowId >= 0) {
+      return { code: 0 };
+    }
+    return { code: -1, msg: '注册失败，请稍后重试' };
   } catch (err) {
-    return { code: -1, msg: '网络连接失败，请检查网络后重试' };
+    return { code: -1, msg: '该手机号已被注册' };
   }
 }
 
 /**
- * 手机号+密码登录
- * POST /api/user/login
+ * 根据手机号（即 id）查询用户
  */
-export async function userLogin(phone: string, password: string): Promise<ApiResult> {
+export async function getUser(userId: string): Promise<ApiResult> {
   try {
-    const loginData: LoginRequest = { phone, password };
-    const request = http.createHttp();
-    const response = await request.request(
-      `${ApiConfig.BASE_URL}/api/user/login`,
-      {
-        method: http.RequestMethod.POST,
-        header: { 'Content-Type': 'application/json' },
-        extraData: JSON.stringify(loginData),
-        connectTimeout: 10000,
-        readTimeout: 10000
-      }
-    );
-    request.destroy();
-    return parseResponse(response);
+    const row: UserRow | null = await DatabaseHelper.queryUserByPhone(userId);
+    if (row) {
+      return { code: 0, data: row as object };
+    }
+    return { code: -1, msg: '用户不存在' };
   } catch (err) {
-    return { code: -1, msg: '网络连接失败，请检查网络后重试' };
-  }
-}
-
-/**
- * 根据手机号查询用户
- * GET /api/user/getUser?phone=xxx
- */
-export async function getUser(phone: string): Promise<ApiResult> {
-  try {
-    const request = http.createHttp();
-    const response = await request.request(
-      `${ApiConfig.BASE_URL}/api/user/getUser?phone=${encodeURIComponent(phone)}`,
-      {
-        method: http.RequestMethod.GET,
-        connectTimeout: 10000,
-        readTimeout: 10000
-      }
-    );
-    request.destroy();
-    return parseResponse(response);
-  } catch (err) {
-    return { code: -1, msg: '网络连接失败，请检查网络后重试' };
+    return { code: -1, msg: '查询失败' };
   }
 }
 
@@ -147,21 +89,4 @@ export async function publishComment(commentData: object): Promise<ApiResult> {
 
 export async function getCommentByTid(targetId: string): Promise<ApiResult> {
   return { code: -1, msg: '暂未接入后端' };
-}
-
-// ============================================================
-// 工具函数
-// ============================================================
-
-function parseResponse(response: http.HttpResponse): ApiResult {
-  // http.ResponseCode.OK = 200
-  if (response.responseCode === 200) {
-    try {
-      const body = JSON.parse(response.result as string) as ApiResult;
-      return body;
-    } catch (e) {
-      return { code: -1, msg: '服务器响应格式异常' };
-    }
-  }
-  return { code: -1, msg: `服务器错误 (${response.responseCode})` };
 }

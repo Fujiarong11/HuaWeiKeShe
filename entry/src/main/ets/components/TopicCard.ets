@@ -42,7 +42,7 @@ export struct TopicCard {
 
       // 统计 + 关注按钮
       Row() {
-        Text(`${this.topic.followerCount} 关注 · ${this.topic.questionCount} 问题`)
+        Text(`${this.topic.followerCount} 关注`)
           .fontSize(10)
           .fontColor('#BBB')
           .layoutWeight(1)
