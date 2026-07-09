@@ -1,130 +1,92 @@
 /**
- * 腾讯云 CloudBase 云函数 API
- * 通过 @cloudbase/app SDK 调用
+ * 本地数据库 API
+ * 使用 HarmonyOS RelationalStore 替代 CloudBase 云函数
  *
- * 你的云函数支持以下 action：
- *   userRegister    - 注册用户
- *   getUser         - 查询用户
- *   addTopic        - 创建话题
- *   getAllTopic     - 获取所有话题
- *   publishQuestion - 发布提问
- *   getQuestionList - 获取问题列表
- *   publishAnswer   - 发布回答
- *   getAnswerByQid  - 按问题ID查回答
- *   publishComment  - 发布评论
- *   getCommentByTid - 按目标ID查评论
+ * 当前已实现本地版本：
+ *   userRegister    - 注册用户（写入本地数据库）
+ *   getUser         - 查询用户（按手机号查本地数据库）
+ *
+ * 其余 API（发帖、回答、评论等）仍为占位，后续可接入后端。
  */
-import { tcb } from '../tcb/CloudConfig';
+import { DatabaseHelper } from '../data/DatabaseHelper';
+import type { UserRow } from '../data/DatabaseHelper';
 
 /**
- * 云函数通用返回结构
+ * API 通用返回结构（与旧 CloudBase 接口兼容）
  */
-interface CloudFunctionResult {
+interface ApiResult {
   code: number;
   msg?: string;
   data?: object;
 }
 
-/**
- * 云函数调用参数类型定义
- */
-interface IdParams {
-  id: string;
-}
-
-interface QidParams {
-  qid: string;
-}
-
-interface TidParams {
-  tid: string;
-}
-
-interface QuestionListParams {
-  filter: object;
-  skip: number;
-  limit: number;
-}
+// ============================================================
+// 用户相关 API（已接本地数据库）
+// ============================================================
 
 /**
- * 调用云函数底层方法
+ * 注册新用户
  */
-async function callFunction(action: string, data: object): Promise<CloudFunctionResult> {
+export async function userRegister(userData: object): Promise<ApiResult> {
   try {
-    const res = await tcb.callFunction({
-      name: 'scfnodejshelloworld',
-      data: {
-        action: action,
-        data: data
-      }
-    });
-    return res.result as CloudFunctionResult;
+    const row: UserRow = userData as UserRow;
+    const rowId: number = await DatabaseHelper.insertUser(row);
+    if (rowId >= 0) {
+      return { code: 0 };
+    }
+    return { code: -1, msg: '注册失败，请稍后重试' };
   } catch (err) {
-    return { code: -1, msg: '网络连接失败，请检查网络后重试' };
+    return { code: -1, msg: '该手机号已被注册' };
+  }
+}
+
+/**
+ * 根据手机号（即 id）查询用户
+ */
+export async function getUser(userId: string): Promise<ApiResult> {
+  try {
+    const row: UserRow | null = await DatabaseHelper.queryUserByPhone(userId);
+    if (row) {
+      return { code: 0, data: row as object };
+    }
+    return { code: -1, msg: '用户不存在' };
+  } catch (err) {
+    return { code: -1, msg: '查询失败' };
   }
 }
 
 // ============================================================
-// 用户相关 API
+// 以下 API 为占位（后续接入后端）
 // ============================================================
 
-export async function userRegister(userData: object): Promise<CloudFunctionResult> {
-  return callFunction('userRegister', userData);
+export async function addTopic(topicData: object): Promise<ApiResult> {
+  return { code: -1, msg: '暂未接入后端' };
 }
 
-export async function getUser(userId: string): Promise<CloudFunctionResult> {
-  const params: IdParams = { id: userId };
-  return callFunction('getUser', params);
+export async function getAllTopic(): Promise<ApiResult> {
+  return { code: -1, msg: '暂未接入后端' };
 }
 
-// ============================================================
-// 话题相关 API
-// ============================================================
-
-export async function addTopic(topicData: object): Promise<CloudFunctionResult> {
-  return callFunction('addTopic', topicData);
+export async function publishQuestion(questionData: object): Promise<ApiResult> {
+  return { code: -1, msg: '暂未接入后端' };
 }
 
-export async function getAllTopic(): Promise<CloudFunctionResult> {
-  const params: Record<string, Object> = {};
-  return callFunction('getAllTopic', params);
+export async function getQuestionList(filter: object, skip: number, limit: number): Promise<ApiResult> {
+  return { code: -1, msg: '暂未接入后端' };
 }
 
-// ============================================================
-// 提问相关 API
-// ============================================================
-
-export async function publishQuestion(questionData: object): Promise<CloudFunctionResult> {
-  return callFunction('publishQuestion', questionData);
+export async function publishAnswer(answerData: object): Promise<ApiResult> {
+  return { code: -1, msg: '暂未接入后端' };
 }
 
-export async function getQuestionList(filter: object, skip: number, limit: number): Promise<CloudFunctionResult> {
-  const params: QuestionListParams = { filter, skip, limit };
-  return callFunction('getQuestionList', params);
+export async function getAnswerByQid(questionId: string): Promise<ApiResult> {
+  return { code: -1, msg: '暂未接入后端' };
 }
 
-// ============================================================
-// 回答相关 API
-// ============================================================
-
-export async function publishAnswer(answerData: object): Promise<CloudFunctionResult> {
-  return callFunction('publishAnswer', answerData);
+export async function publishComment(commentData: object): Promise<ApiResult> {
+  return { code: -1, msg: '暂未接入后端' };
 }
 
-export async function getAnswerByQid(questionId: string): Promise<CloudFunctionResult> {
-  const params: QidParams = { qid: questionId };
-  return callFunction('getAnswerByQid', params);
-}
-
-// ============================================================
-// 评论相关 API
-// ============================================================
-
-export async function publishComment(commentData: object): Promise<CloudFunctionResult> {
-  return callFunction('publishComment', commentData);
-}
-
-export async function getCommentByTid(targetId: string): Promise<CloudFunctionResult> {
-  const params: TidParams = { tid: targetId };
-  return callFunction('getCommentByTid', params);
+export async function getCommentByTid(targetId: string): Promise<ApiResult> {
+  return { code: -1, msg: '暂未接入后端' };
 }

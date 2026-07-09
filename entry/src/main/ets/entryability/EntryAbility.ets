@@ -2,6 +2,7 @@ import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.Ab
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
+import { DatabaseHelper } from '../data/DatabaseHelper';
 
 const DOMAIN = 0x0000;
 
@@ -12,6 +13,9 @@ export default class EntryAbility extends UIAbility {
     } catch (err) {
       hilog.error(DOMAIN, 'testTag', 'Failed to set colorMode. Cause: %{public}s', JSON.stringify(err));
     }
+
+    // 初始化本地数据库
+    DatabaseHelper.init(this.context);
 
     // 检测设备类型并存储到 AppStorage，用于分布式布局适配
     try {
