@@ -40,6 +40,16 @@ export class InviteRecord {
   createdAt: string = '';
 }
 
+// ============ 种子问题数据类型 ============
+
+interface SeedQuestionData {
+  title: string;
+  content: string;
+  topicIds: string[];
+  authorId: string;
+  createdAt: string;
+}
+
 // ============ 数据仓库 ============
 
 export class MockDataStore {
@@ -130,7 +140,7 @@ export class MockDataStore {
       }
 
       // 种子提问：覆盖全部 20 个话题，模拟真实校园内容
-      const seedQuestions: Array<{title: string; content: string; topicIds: string[]; authorId: string; createdAt: string}> = [
+      const seedQuestions: SeedQuestionData[] = [
         // 高等数学 t_6000
         { title: '可微与可导的区别到底是什么？', content: '高数课上说可微一定可导，但反过来成立吗？有没有反例可以直观理解？', topicIds: ['t_6000'], authorId: 'u_seed_2', createdAt: '2026-06-15T10:30:00Z' },
         { title: '二重积分换元法有没有什么技巧？', content: '每次做二重积分换元，Jacobian公式就记混…求大神分享记忆方法', topicIds: ['t_6000','t_6012'], authorId: 'u_seed_1', createdAt: '2026-06-20T14:20:00Z' },
