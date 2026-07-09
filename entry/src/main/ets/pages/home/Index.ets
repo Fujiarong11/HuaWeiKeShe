@@ -3,13 +3,13 @@
  * 包含首页、话题广场、发布、通知、个人中心五个 Tab
  */
 import { HomePage } from './HomePage';
-import { TopicSquarePage } from './TopicSquarePage';
-import { PostQuestionPage } from './PostQuestionPage';
-import { NotificationPage } from './NotificationPage';
-import { ProfilePage } from './ProfilePage';
-import { UserViewModel } from '../viewmodel/UserViewModel';
-import { getUnreadNotificationCount, getStore } from '../mock/MockData';
-import { DatabaseHelper, UserRow } from '../data/DatabaseHelper';
+import { TopicSquarePage } from '../discover/TopicSquarePage';
+import { PostQuestionPage } from '../question/PostQuestionPage';
+import { NotificationPage } from '../discover/NotificationPage';
+import { ProfilePage } from '../user/ProfilePage';
+import { UserViewModel } from '../../viewmodel/UserViewModel';
+import { getUnreadNotificationCount, getStore } from '../../mock/MockData';
+import { DatabaseHelper, UserRow } from '../../data/DatabaseHelper';
 import { router } from '@kit.ArkUI';
 
 @Entry
@@ -48,7 +48,7 @@ struct Index {
     } else {
       // 2. 未登录，跳转到登录页
       this.isCheckingAuth = false;
-      router.replaceUrl({ url: 'pages/LoginPage' });
+      router.replaceUrl({ url: 'pages/login-register/LoginPage' });
     }
   }
 

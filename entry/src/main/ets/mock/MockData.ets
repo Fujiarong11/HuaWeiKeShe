@@ -42,7 +42,7 @@ export class InviteRecord {
 
 // ============ 数据仓库 ============
 
-class MockDataStore {
+export class MockDataStore {
   private static instance: MockDataStore;
 
   users: UserModel[] = [];

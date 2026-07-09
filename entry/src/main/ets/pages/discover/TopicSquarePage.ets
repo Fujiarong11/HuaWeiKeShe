@@ -2,11 +2,11 @@
  * 话题广场页面
  * 展示所有话题，支持搜索和关注
  */
-import { TopicModel } from '../model/TopicModel';
-import { TopicCard } from '../components/TopicCard';
-import { SearchBar } from '../components/SearchBar';
-import { EmptyPlaceholder } from '../components/EmptyPlaceholder';
-import { TopicViewModel } from '../viewmodel/TopicViewModel';
+import { TopicModel } from '../../model/TopicModel';
+import { TopicCard } from '../../components/TopicCard';
+import { SearchBar } from '../../components/SearchBar';
+import { EmptyPlaceholder } from '../../components/EmptyPlaceholder';
+import { TopicViewModel } from '../../viewmodel/TopicViewModel';
 import { router } from '@kit.ArkUI';
 
 @Component
@@ -63,7 +63,7 @@ export struct TopicSquarePage {
                     .onClick(() => {
                       AppStorage.setOrCreate('searchKeyword', topic.name);
                       router.pushUrl({
-                        url: 'pages/SearchPage',
+                        url: 'pages/discover/SearchPage',
                         params: { topicId: topic.id }
                       });
                     })
@@ -92,7 +92,7 @@ export struct TopicSquarePage {
                 onCardClick: () => {
                   AppStorage.setOrCreate('searchKeyword', topic.name);
                   router.pushUrl({
-                    url: 'pages/SearchPage',
+                    url: 'pages/discover/SearchPage',
                     params: { topicId: topic.id }
                   });
                 },

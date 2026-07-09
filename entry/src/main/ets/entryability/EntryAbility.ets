@@ -2,6 +2,7 @@ import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.Ab
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
+import { DatabaseHelper } from '../data/DatabaseHelper';
 
 const DOMAIN = 0x0000;
 
@@ -23,6 +24,14 @@ export default class EntryAbility extends UIAbility {
       AppStorage.setOrCreate('deviceType', 'phone');
     }
 
+    // 初始化本地数据库
+    try {
+      DatabaseHelper.init(this.context);
+      hilog.info(DOMAIN, 'testTag', 'Database initialized');
+    } catch (err) {
+      hilog.error(DOMAIN, 'testTag', 'Database init failed: %{public}s', JSON.stringify(err));
+    }
+
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
   }
 
@@ -33,7 +42,7 @@ export default class EntryAbility extends UIAbility {
   onWindowStageCreate(windowStage: window.WindowStage): void {
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageCreate');
 
-    windowStage.loadContent('pages/Index', (err) => {
+    windowStage.loadContent('pages/home/Index', (err) => {
       if (err.code) {
         hilog.error(DOMAIN, 'testTag', 'Failed to load the content. Cause: %{public}s', JSON.stringify(err));
         return;

@@ -1,10 +1,10 @@
 /**
  * 登录页面
  * 支持手机号登录和用户名注册两种模式
- * 对接腾讯云 CloudBase 云函数 scfnodejshelloworld
+ * 对接 Spring Boot 后端 HTTP API
  */
-import { AuthService } from '../services/AuthService';
-import { UserViewModel } from '../viewmodel/UserViewModel';
+import { AuthService } from '../../services/AuthService';
+import { UserViewModel } from '../../viewmodel/UserViewModel';
 import { router } from '@kit.ArkUI';
 import { promptAction } from '@kit.ArkUI';
 
@@ -228,7 +228,7 @@ export struct LoginPage {
           this.userVM.isLoggedIn = true;
           this.userVM.currentUser = result.user;
           promptAction.showToast({ message: '注册成功！', duration: 1500 });
-          router.replaceUrl({ url: 'pages/Index' });
+          router.replaceUrl({ url: 'pages/home/Index' });
         } else {
           promptAction.showToast({ message: result.error || '注册失败，请重试', duration: 2000 });
         }
@@ -240,7 +240,7 @@ export struct LoginPage {
           this.userVM.isLoggedIn = true;
           this.userVM.currentUser = result.user;
           promptAction.showToast({ message: '登录成功！', duration: 1500 });
-          router.replaceUrl({ url: 'pages/Index' });
+          router.replaceUrl({ url: 'pages/home/Index' });
         } else {
           promptAction.showToast({ message: result.error || '登录失败，请重试', duration: 2000 });
         }

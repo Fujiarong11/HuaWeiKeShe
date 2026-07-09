@@ -121,7 +121,7 @@ export class UserViewModel {
     AppStorage.setOrCreate('currentUserId', '');
     // 跳转到登录页并清空页面栈
     router.clear();
-    router.replaceUrl({ url: 'pages/LoginPage' });
+    router.replaceUrl({ url: 'pages/login-register/LoginPage' });
   }
 
   /**

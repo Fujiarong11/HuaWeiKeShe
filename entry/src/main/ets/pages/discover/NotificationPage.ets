@@ -2,9 +2,9 @@
  * 通知页面
  * 展示各类系统通知
  */
-import { NotificationItem } from '../mock/MockData';
-import { getNotifications, markNotificationRead } from '../mock/MockData';
-import { EmptyPlaceholder } from '../components/EmptyPlaceholder';
+import { NotificationItem } from '../../mock/MockData';
+import { getNotifications, markNotificationRead } from '../../mock/MockData';
+import { EmptyPlaceholder } from '../../components/EmptyPlaceholder';
 import { router } from '@kit.ArkUI';
 
 @Component
@@ -97,7 +97,7 @@ export struct NotificationPage {
                 // 跳转到相关页面
                 if (noti.targetQuestionId) {
                   router.pushUrl({
-                    url: 'pages/QuestionDetailPage',
+                    url: 'pages/question/QuestionDetailPage',
                     params: { questionId: noti.targetQuestionId }
                   });
                 }

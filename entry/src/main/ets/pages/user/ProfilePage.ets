@@ -2,14 +2,14 @@
  * 个人中心页面
  * 展示当前用户信息、问答统计、关注粉丝等
  */
-import { UserModel } from '../model/UserModel';
-import { QuestionModel, QuestionStatus } from '../model/QuestionModel';
-import { AnswerModel } from '../model/AnswerModel';
-import { QuestionCard } from '../components/QuestionCard';
-import { UserViewModel } from '../viewmodel/UserViewModel';
-import { DatabaseHelper, QuestionRow, AnswerRow } from '../data/DatabaseHelper';
-import { TopicModel } from '../model/TopicModel';
-import { getStore } from '../mock/MockData';
+import { UserModel } from '../../model/UserModel';
+import { QuestionModel, QuestionStatus } from '../../model/QuestionModel';
+import { AnswerModel } from '../../model/AnswerModel';
+import { QuestionCard } from '../../components/QuestionCard';
+import { UserViewModel } from '../../viewmodel/UserViewModel';
+import { DatabaseHelper, QuestionRow, AnswerRow } from '../../data/DatabaseHelper';
+import { TopicModel } from '../../model/TopicModel';
+import { getStore } from '../../mock/MockData';
 import { router } from '@kit.ArkUI';
 
 @Component
@@ -170,7 +170,7 @@ export struct ProfilePage {
                   showTopicTags: true,
                   onCardClick: () => {
                     router.pushUrl({
-                      url: 'pages/QuestionDetailPage',
+                      url: 'pages/question/QuestionDetailPage',
                       params: { questionId: question.id }
                     });
                   }

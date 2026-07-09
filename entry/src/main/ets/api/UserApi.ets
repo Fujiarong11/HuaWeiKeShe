@@ -1,36 +1,22 @@
 /**
- * 本地数据库 API
- * 使用 HarmonyOS RelationalStore 替代 CloudBase 云函数
- *
- * 当前已实现本地版本：
- *   userRegister    - 注册用户（写入本地数据库）
- *   getUser         - 查询用户（按手机号查本地数据库）
- *
- * 其余 API（发帖、回答、评论等）仍为占位，后续可接入后端。
+ * 用户本地数据库 API
+ * 使用 HarmonyOS RelationalStore 做注册登录
  */
 import { DatabaseHelper } from '../data/DatabaseHelper';
 import type { UserRow } from '../data/DatabaseHelper';
 
-/**
- * API 通用返回结构（与旧 CloudBase 接口兼容）
- */
-interface ApiResult {
+export interface ApiResult {
   code: number;
   msg?: string;
   data?: object;
 }
 
-// ============================================================
-// 用户相关 API（已接本地数据库）
-// ============================================================
-
 /**
- * 注册新用户
+ * 注册新用户（写入本地数据库）
  */
-export async function userRegister(userData: object): Promise<ApiResult> {
+export async function userRegister(userData: UserRow): Promise<ApiResult> {
   try {
-    const row: UserRow = userData as UserRow;
-    const rowId: number = await DatabaseHelper.insertUser(row);
+    const rowId: number = await DatabaseHelper.insertUser(userData);
     if (rowId >= 0) {
       return { code: 0 };
     }
@@ -41,11 +27,11 @@ export async function userRegister(userData: object): Promise<ApiResult> {
 }
 
 /**
- * 根据手机号（即 id）查询用户
+ * 根据手机号查询用户
  */
-export async function getUser(userId: string): Promise<ApiResult> {
+export async function getUser(phone: string): Promise<ApiResult> {
   try {
-    const row: UserRow | null = await DatabaseHelper.queryUserByPhone(userId);
+    const row: UserRow | null = await DatabaseHelper.queryUserByPhone(phone);
     if (row) {
       return { code: 0, data: row as object };
     }
@@ -53,40 +39,4 @@ export async function getUser(userId: string): Promise<ApiResult> {
   } catch (err) {
     return { code: -1, msg: '查询失败' };
   }
-}
-
-// ============================================================
-// 以下 API 为占位（后续接入后端）
-// ============================================================
-
-export async function addTopic(topicData: object): Promise<ApiResult> {
-  return { code: -1, msg: '暂未接入后端' };
-}
-
-export async function getAllTopic(): Promise<ApiResult> {
-  return { code: -1, msg: '暂未接入后端' };
-}
-
-export async function publishQuestion(questionData: object): Promise<ApiResult> {
-  return { code: -1, msg: '暂未接入后端' };
-}
-
-export async function getQuestionList(filter: object, skip: number, limit: number): Promise<ApiResult> {
-  return { code: -1, msg: '暂未接入后端' };
-}
-
-export async function publishAnswer(answerData: object): Promise<ApiResult> {
-  return { code: -1, msg: '暂未接入后端' };
-}
-
-export async function getAnswerByQid(questionId: string): Promise<ApiResult> {
-  return { code: -1, msg: '暂未接入后端' };
-}
-
-export async function publishComment(commentData: object): Promise<ApiResult> {
-  return { code: -1, msg: '暂未接入后端' };
-}
-
-export async function getCommentByTid(targetId: string): Promise<ApiResult> {
-  return { code: -1, msg: '暂未接入后端' };
 }

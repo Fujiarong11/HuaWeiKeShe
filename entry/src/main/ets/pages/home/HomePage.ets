@@ -2,13 +2,13 @@
  * 首页推荐页面
  * 展示个性化推荐的问题信息流
  */
-import { QuestionModel } from '../model/QuestionModel';
-import { TopicModel } from '../model/TopicModel';
-import { QuestionCard } from '../components/QuestionCard';
-import { LoadingFooter } from '../components/LoadingFooter';
-import { EmptyPlaceholder } from '../components/EmptyPlaceholder';
-import { HomeViewModel } from '../viewmodel/HomeViewModel';
-import { HomeTabType } from '../common/constants/CommonConstants';
+import { QuestionModel } from '../../model/QuestionModel';
+import { TopicModel } from '../../model/TopicModel';
+import { QuestionCard } from '../../components/QuestionCard';
+import { LoadingFooter } from '../../components/LoadingFooter';
+import { EmptyPlaceholder } from '../../components/EmptyPlaceholder';
+import { HomeViewModel } from '../../viewmodel/HomeViewModel';
+import { HomeTabType } from '../../common/constants/CommonConstants';
 import { router } from '@kit.ArkUI';
 
 @Component
@@ -53,7 +53,7 @@ export struct HomePage {
           .backgroundColor('#F5F5F5').textAlign(TextAlign.Center)
           .onClick(() => {
             AppStorage.setOrCreate('searchKeyword', '');
-            router.pushUrl({ url: 'pages/SearchPage' });
+            router.pushUrl({ url: 'pages/discover/SearchPage' });
           })
       }
       .width('100%').padding({ left: 16, right: 16, top: 8, bottom: 4 })
@@ -96,7 +96,7 @@ export struct HomePage {
                 .onClick(() => {
                   AppStorage.setOrCreate('searchKeyword', topic.name);
                   router.pushUrl({
-                    url: 'pages/SearchPage',
+                    url: 'pages/discover/SearchPage',
                     params: { topicId: topic.id }
                   });
                 })
@@ -118,7 +118,7 @@ export struct HomePage {
                 showTopicTags: true,
                 onCardClick: () => {
                   router.pushUrl({
-                    url: 'pages/QuestionDetailPage',
+                    url: 'pages/question/QuestionDetailPage',
                     params: { questionId: question.id }
                   });
                 }

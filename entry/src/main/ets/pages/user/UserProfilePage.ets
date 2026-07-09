@@ -1,11 +1,12 @@
 /**
  * 他人主页
  */
-import { UserModel } from '../model/UserModel';
-import { QuestionModel } from '../model/QuestionModel';
-import { AnswerModel } from '../model/AnswerModel';
-import { QuestionCard } from '../components/QuestionCard';
-import { UserViewModel } from '../viewmodel/UserViewModel';
+import { UserModel } from '../../model/UserModel';
+import { QuestionModel } from '../../model/QuestionModel';
+import { AnswerModel } from '../../model/AnswerModel';
+import { QuestionCard } from '../../components/QuestionCard';
+import { UserViewModel } from '../../viewmodel/UserViewModel';
+import { getStore, MockDataStore } from '../../mock/MockData';
 import { router } from '@kit.ArkUI';
 
 @Entry
@@ -21,9 +22,9 @@ export struct UserProfilePage {
     if (this.userId) {
       await this.userVM.loadUserProfile(this.userId);
       // Also load questions and answers
-      const store = (await import('../mock/MockData')).getStore();
-      const questions = store.questions.filter(q => q.author.id === this.userId);
-      const answers = store.answers.filter(a => a.author.id === this.userId);
+      const store: MockDataStore = getStore();
+      const questions: QuestionModel[] = store.questions.filter((q: QuestionModel): boolean => q.author.id === this.userId);
+      const answers: AnswerModel[] = store.answers.filter((a: AnswerModel): boolean => a.author.id === this.userId);
       this.userVM.userQuestions.reloadData(questions);
       this.userVM.userAnswers.reloadData(answers);
       this.dataVersion++;
@@ -125,7 +126,7 @@ export struct UserProfilePage {
                       question: q, showTopicTags: true,
                       onCardClick: () => {
                         router.pushUrl({
-                          url: 'pages/QuestionDetailPage',
+                          url: 'pages/question/QuestionDetailPage',
                           params: { questionId: q.id }
                         });
                       }

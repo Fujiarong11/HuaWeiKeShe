@@ -136,6 +136,7 @@ export interface DbResult {
 export class DatabaseHelper {
   private static store: relationalStore.RdbStore | null = null;
   private static initialized: boolean = false;
+  private static initPromise: Promise<void> | null = null;
 
   /**
    * 初始化数据库（应在 EntryAbility 中调用一次）
@@ -144,6 +145,14 @@ export class DatabaseHelper {
     if (DatabaseHelper.initialized) {
       return;
     }
+    if (DatabaseHelper.initPromise) {
+      return DatabaseHelper.initPromise;
+    }
+    DatabaseHelper.initPromise = DatabaseHelper.doInit(context);
+    await DatabaseHelper.initPromise;
+  }
+
+  private static async doInit(context: Context): Promise<void> {
     try {
       DatabaseHelper.store = await relationalStore.getRdbStore(context, STORE_CONFIG);
       await DatabaseHelper.store.executeSql(SQL_CREATE_USERS);
@@ -158,6 +167,7 @@ export class DatabaseHelper {
   // ========== 用户操作 ==========
 
   static async insertUser(user: UserRow): Promise<number> {
+    await DatabaseHelper.initPromise;
     if (!DatabaseHelper.store) { return -1; }
     const bucket: relationalStore.ValuesBucket = {
       id: user.id,
@@ -183,6 +193,7 @@ export class DatabaseHelper {
   }
 
   static async queryUserByPhone(phone: string): Promise<UserRow | null> {
+    await DatabaseHelper.initPromise;
     if (!DatabaseHelper.store) { return null; }
     const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('users');
     predicates.equalTo('phone', phone);
@@ -193,6 +204,7 @@ export class DatabaseHelper {
   }
 
   static async queryUserById(id: string): Promise<UserRow | null> {
+    await DatabaseHelper.initPromise;
     if (!DatabaseHelper.store) { return null; }
     const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('users');
     predicates.equalTo('id', id);

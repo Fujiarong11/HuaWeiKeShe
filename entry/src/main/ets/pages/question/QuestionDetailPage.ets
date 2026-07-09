@@ -1,17 +1,17 @@
 /**
  * 问题详情页 — 展示完整问题内容、回答列表、互动操作
  */
-import { QuestionModel } from '../model/QuestionModel';
-import { AnswerModel } from '../model/AnswerModel';
-import { CommentModel, CommentTargetType } from '../model/CommentModel';
-import { AnswerCard } from '../components/AnswerCard';
-import { CommentItem } from '../components/CommentItem';
-import { InteractiveBar } from '../components/InteractiveBar';
-import { LoadingFooter } from '../components/LoadingFooter';
-import { UserInfoBar } from '../components/UserInfoBar';
-import { QuestionViewModel } from '../viewmodel/QuestionViewModel';
-import { AnswerSortType } from '../common/constants/CommonConstants';
-import { getStore } from '../mock/MockData';
+import { QuestionModel } from '../../model/QuestionModel';
+import { AnswerModel } from '../../model/AnswerModel';
+import { CommentModel, CommentTargetType } from '../../model/CommentModel';
+import { AnswerCard } from '../../components/AnswerCard';
+import { CommentItem } from '../../components/CommentItem';
+import { InteractiveBar } from '../../components/InteractiveBar';
+import { LoadingFooter } from '../../components/LoadingFooter';
+import { UserInfoBar } from '../../components/UserInfoBar';
+import { QuestionViewModel } from '../../viewmodel/QuestionViewModel';
+import { AnswerSortType } from '../../common/constants/CommonConstants';
+import { getStore } from '../../mock/MockData';
 import { router } from '@kit.ArkUI';
 
 @Entry
@@ -96,7 +96,7 @@ export struct QuestionDetailPage {
                         const topicName = this.getTopicName(tid);
                         AppStorage.setOrCreate('searchKeyword', topicName);
                         router.pushUrl({
-                          url: 'pages/SearchPage',
+                          url: 'pages/discover/SearchPage',
                           params: { topicId: tid }
                         });
                       })
@@ -174,7 +174,7 @@ export struct QuestionDetailPage {
                           },
                           onAuthorClick: (uid: string) => {
                             AppStorage.setOrCreate('targetUserId', uid);
-                            router.pushUrl({ url: 'pages/UserProfilePage' });
+                            router.pushUrl({ url: 'pages/user/UserProfilePage' });
                           }
                         })
 

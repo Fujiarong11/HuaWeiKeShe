@@ -1,16 +1,12 @@
 /**
  * 认证服务层
- * 对接 Spring Boot 后端 HTTP API
- *
- * 后端接口：
- *   POST /api/user/register  — 注册
- *   POST /api/user/login      — 登录
- *   GET  /api/user/getUser    — 查用户
+ * 使用本地数据库做注册登录
  */
 import { preferences } from '@kit.ArkData';
 import { UserModel, LoginResult, RegisterResult } from '../model/UserModel';
 import * as UserApi from '../api/UserApi';
-import type { RegisterRequest } from '../api/UserApi';
+import type { ApiResult } from '../api/UserApi';
+import type { UserRow } from '../data/DatabaseHelper';
 
 const PREF_NAME = 'auth_preferences';
 const KEY_USER_ID = 'auth_user_id';
@@ -22,29 +18,6 @@ const USERNAME_MIN = 2;
 const USERNAME_MAX = 20;
 const PHONE_REGEX = /^1[3-9]\d{9}$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_一-龥]+$/;
-
-/**
- * 注册用户数据结构（用于对象字面量类型标注）
- */
-interface RegisterUserData {
-  id: string | number;
-  username: string;
-  phone: string;
-  password: string;
-  name: string;
-  avatar: string;
-  bio: string;
-  college: string;
-  major: string;
-  grade: string;
-  reputation: number;
-  acceptedCount: number;
-  totalAnswers: number;
-  totalQuestions: number;
-  followerCount: number;
-  followingCount: number;
-  createdAt: string;
-}
 
 /**
  * 会话持久化数据结构
@@ -110,23 +83,36 @@ export class AuthService {
     if (err) return { success: false, error: err };
 
     try {
-      // 先检查手机号是否已注册
-      const check = await UserApi.getUser(phone.trim());
+      // 检查手机号是否已注册
+      const check: ApiResult = await UserApi.getUser(phone.trim());
       if (check.code === 0 && check.data) {
         return { success: false, error: '该手机号已被注册' };
       }
 
-      // 调用后端注册接口
-      const registerData: RegisterRequest = {
+      // 写入本地数据库
+      const userRow: UserRow = {
+        id: phone.trim(),
         phone: phone.trim(),
         username: username.trim(),
-        password: password
+        password: password,
+        name: username.trim(),
+        avatar: '',
+        bio: '',
+        college: '',
+        major: '',
+        grade: '',
+        reputation: 0,
+        acceptedCount: 0,
+        totalAnswers: 0,
+        totalQuestions: 0,
+        followerCount: 0,
+        followingCount: 0,
+        createdAt: new Date().toISOString()
       };
-      const res = await UserApi.userRegister(registerData);
+      const res: ApiResult = await UserApi.userRegister(userRow);
 
-      if (res.code === 0 && res.data) {
-        const userData = res.data as RegisterUserData;
-        const user = this.buildUserModel(userData);
+      if (res.code === 0) {
+        const user: UserModel = this.buildUserModel(userRow);
         await this.saveSession(user);
         AppStorage.setOrCreate('currentUser', user);
         AppStorage.setOrCreate('currentUserId', user.id);
@@ -135,7 +121,7 @@ export class AuthService {
         return { success: false, error: (res.msg || '注册失败') as string };
       }
     } catch (e) {
-      return { success: false, error: '网络连接失败，请检查网络后重试' };
+      return { success: false, error: '注册失败，请稍后重试' };
     }
   }
 
@@ -146,21 +132,25 @@ export class AuthService {
     if (err) return { success: false, error: err };
 
     try {
-      // 调用后端登录接口（后端做 BCrypt 密码校验）
-      const res = await UserApi.userLogin(phone.trim(), password);
+      // 从本地数据库查用户
+      const res: ApiResult = await UserApi.getUser(phone.trim());
 
       if (res.code === 0 && res.data) {
-        const userData = res.data as RegisterUserData;
-        const user = this.buildUserModel(userData);
+        const row: UserRow = res.data as UserRow;
+        // 本地明文密码比对
+        if (row.password !== password) {
+          return { success: false, error: '手机号或密码错误' };
+        }
+        const user: UserModel = this.buildUserModel(row);
         await this.saveSession(user);
         AppStorage.setOrCreate('currentUser', user);
         AppStorage.setOrCreate('currentUserId', user.id);
         return { success: true, user, token: `token_${Date.now()}` };
       } else {
-        return { success: false, error: (res.msg || '手机号或密码错误') as string };
+        return { success: false, error: '手机号或密码错误' };
       }
     } catch (e) {
-      return { success: false, error: '网络连接失败，请检查网络后重试' };
+      return { success: false, error: '登录失败，请稍后重试' };
     }
   }
 
@@ -182,12 +172,12 @@ export class AuthService {
   async tryRestoreSession(): Promise<UserModel | null> {
     try {
       const pref = await preferences.getPreferences(getContext(), PREF_NAME);
-      const savedId = pref.getSync(KEY_USER_ID, '') as string;
-      const savedInfo = pref.getSync(KEY_USER_INFO, '') as string;
+      const savedId: string = pref.getSync(KEY_USER_ID, '') as string;
+      const savedInfo: string = pref.getSync(KEY_USER_INFO, '') as string;
 
       if (savedId && savedInfo) {
-        const data = JSON.parse(savedInfo) as RegisterUserData;
-        const user = this.buildUserModel(data);
+        const data: SessionData = JSON.parse(savedInfo) as SessionData;
+        const user: UserModel = this.buildUserFromSession(data);
         AppStorage.setOrCreate('currentUser', user);
         AppStorage.setOrCreate('currentUserId', user.id);
         return user;
@@ -197,6 +187,44 @@ export class AuthService {
   }
 
   // ========== 内部工具 ==========
+
+  private buildUserModel(row: UserRow): UserModel {
+    const u: UserModel = new UserModel();
+    u.id = row.id;
+    u.name = row.username || row.name;
+    u.avatar = row.avatar;
+    u.bio = row.bio;
+    u.college = row.college;
+    u.major = row.major;
+    u.grade = row.grade;
+    u.reputation = row.reputation;
+    u.acceptedCount = row.acceptedCount;
+    u.totalAnswers = row.totalAnswers;
+    u.totalQuestions = row.totalQuestions;
+    u.followerCount = row.followerCount;
+    u.followingCount = row.followingCount;
+    u.createdAt = row.createdAt;
+    return u;
+  }
+
+  private buildUserFromSession(data: SessionData): UserModel {
+    const u: UserModel = new UserModel();
+    u.id = data.id;
+    u.name = data.name;
+    u.avatar = data.avatar;
+    u.bio = data.bio;
+    u.college = data.college;
+    u.major = data.major;
+    u.grade = data.grade;
+    u.reputation = parseInt(data.reputation) || 0;
+    u.acceptedCount = parseInt(data.acceptedCount) || 0;
+    u.totalAnswers = parseInt(data.totalAnswers) || 0;
+    u.totalQuestions = parseInt(data.totalQuestions) || 0;
+    u.followerCount = parseInt(data.followerCount) || 0;
+    u.followingCount = parseInt(data.followingCount) || 0;
+    u.createdAt = data.createdAt;
+    return u;
+  }
 
   private async saveSession(user: UserModel): Promise<void> {
     try {
@@ -216,24 +244,5 @@ export class AuthService {
       await pref.put(KEY_USER_INFO, JSON.stringify(sessionData));
       await pref.flush();
     } catch (e) { /* ignore */ }
-  }
-
-  private buildUserModel(data: RegisterUserData): UserModel {
-    const u = new UserModel();
-    u.id = String(data.id || data.phone || '');
-    u.name = (data.username || data.name || '') as string;
-    u.avatar = (data.avatar || '') as string;
-    u.bio = (data.bio || '') as string;
-    u.college = (data.college || '') as string;
-    u.major = (data.major || '') as string;
-    u.grade = (data.grade || '') as string;
-    u.reputation = (data.reputation || 0) as number;
-    u.acceptedCount = (data.acceptedCount || 0) as number;
-    u.totalAnswers = (data.totalAnswers || 0) as number;
-    u.totalQuestions = (data.totalQuestions || 0) as number;
-    u.followerCount = (data.followerCount || 0) as number;
-    u.followingCount = (data.followingCount || 0) as number;
-    u.createdAt = (data.createdAt || '') as string;
-    return u;
   }
 }

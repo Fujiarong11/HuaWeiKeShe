@@ -1,9 +1,9 @@
 /**
  * 发布提问页面
  */
-import { TopicModel } from '../model/TopicModel';
-import { TopicViewModel } from '../viewmodel/TopicViewModel';
-import { postQuestion, getAllTopics } from '../mock/MockData';
+import { TopicModel } from '../../model/TopicModel';
+import { TopicViewModel } from '../../viewmodel/TopicViewModel';
+import { postQuestion, getAllTopics } from '../../mock/MockData';
 import { promptAction } from '@kit.ArkUI';
 
 @Component

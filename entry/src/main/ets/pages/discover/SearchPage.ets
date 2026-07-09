@@ -1,13 +1,13 @@
 /**
  * 全文搜索页面
  */
-import { QuestionModel } from '../model/QuestionModel';
-import { TopicModel } from '../model/TopicModel';
-import { UserModel } from '../model/UserModel';
-import { QuestionCard } from '../components/QuestionCard';
-import { SearchBar } from '../components/SearchBar';
-import { EmptyPlaceholder } from '../components/EmptyPlaceholder';
-import { searchAll, getQuestionsByTopic } from '../mock/MockData';
+import { QuestionModel } from '../../model/QuestionModel';
+import { TopicModel } from '../../model/TopicModel';
+import { UserModel } from '../../model/UserModel';
+import { QuestionCard } from '../../components/QuestionCard';
+import { SearchBar } from '../../components/SearchBar';
+import { EmptyPlaceholder } from '../../components/EmptyPlaceholder';
+import { searchAll, getQuestionsByTopic } from '../../mock/MockData';
 import { router } from '@kit.ArkUI';
 
 @Entry
@@ -124,7 +124,7 @@ export struct SearchPage {
                     question: q, showTopicTags: true,
                     onCardClick: () => {
                       router.pushUrl({
-                        url: 'pages/QuestionDetailPage',
+                        url: 'pages/question/QuestionDetailPage',
                         params: { questionId: q.id }
                       });
                     }
@@ -181,7 +181,7 @@ export struct SearchPage {
                   .margin({ left: 16, right: 16, top: 4, bottom: 4 })
                   .onClick(() => {
                     AppStorage.setOrCreate('targetUserId', u.id);
-                    router.pushUrl({ url: 'pages/UserProfilePage' });
+                    router.pushUrl({ url: 'pages/user/UserProfilePage' });
                   })
                 }, (u: UserModel) => u.id)
               }
