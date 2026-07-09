@@ -10,6 +10,7 @@
 import { preferences } from '@kit.ArkData';
 import { UserModel, LoginResult, RegisterResult } from '../model/UserModel';
 import * as UserApi from '../api/UserApi';
+import type { RegisterRequest } from '../api/UserApi';
 
 const PREF_NAME = 'auth_preferences';
 const KEY_USER_ID = 'auth_user_id';
@@ -116,11 +117,12 @@ export class AuthService {
       }
 
       // 调用后端注册接口
-      const res = await UserApi.userRegister({
+      const registerData: RegisterRequest = {
         phone: phone.trim(),
         username: username.trim(),
         password: password
-      });
+      };
+      const res = await UserApi.userRegister(registerData);
 
       if (res.code === 0 && res.data) {
         const userData = res.data as RegisterUserData;

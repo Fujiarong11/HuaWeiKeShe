@@ -26,10 +26,19 @@ export interface ApiResult {
 // ============================================================
 
 /**
+ * 注册请求数据结构
+ */
+export interface RegisterRequest {
+  phone: string;
+  username: string;
+  password: string;
+}
+
+/**
  * 注册新用户
  * POST /api/user/register
  */
-export async function userRegister(userData: object): Promise<ApiResult> {
+export async function userRegister(userData: RegisterRequest): Promise<ApiResult> {
   try {
     const request = http.createHttp();
     const response = await request.request(
