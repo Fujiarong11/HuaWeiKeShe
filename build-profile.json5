@@ -1,6 +1,20 @@
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "storeFile": "D:/HuaWeiKeShe-main/miyao/keshe21.p12",
+          "storePassword": "0000001BE638628DDB0F1462F48FCFE533DA52C7F0F32362C847FE2B726EE4B0CC8130778C75259D08D225",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001B1D21769F9E7E987F4D457D31E678AA62DD13E9C460C6946CF93408E68D8B081277311930E4BC6A",
+          "signAlg": "SHA256withECDSA",
+          "profile": "C:\\Users\\32696\\.ohos\\config\\default_HuaWeiKeShe-main_dbEPDZI3_DlBX56neAxX9cj6so97OTCx6VxhnRPj1pE=.p7b",
+          "certpath": "D:/HuaWeiKeShe-main/zhengshu/zhengshu.cer"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",

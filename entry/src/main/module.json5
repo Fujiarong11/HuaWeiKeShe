@@ -16,6 +16,12 @@
         "name": "ohos.permission.INTERNET"
       }
     ],
+    "metadata": [
+      {
+        "name": "client_id",
+        "value": "6917610369806677079"
+      }
+    ],
     "abilities": [
       {
         "name": "EntryAbility",

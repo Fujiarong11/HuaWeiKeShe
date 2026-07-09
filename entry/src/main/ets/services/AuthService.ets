@@ -24,6 +24,49 @@ const USERNAME_MAX = 20;
 const PHONE_REGEX = /^1[3-9]\d{9}$/;
 const USERNAME_REGEX = /^[a-zA-Z0-9_一-龥]+$/;
 
+/**
+ * 注册用户数据结构（用于对象字面量类型标注）
+ */
+interface RegisterUserData {
+  id: string;
+  username: string;
+  phone: string;
+  password: string;
+  name: string;
+  avatar: string;
+  bio: string;
+  college: string;
+  major: string;
+  grade: string;
+  reputation: number;
+  acceptedCount: number;
+  totalAnswers: number;
+  totalQuestions: number;
+  followerCount: number;
+  followingCount: number;
+  createdAt: string;
+}
+
+/**
+ * 会话持久化数据结构
+ */
+interface SessionData {
+  id: string;
+  name: string;
+  avatar: string;
+  bio: string;
+  college: string;
+  major: string;
+  grade: string;
+  reputation: string;
+  acceptedCount: string;
+  totalAnswers: string;
+  totalQuestions: string;
+  followerCount: string;
+  followingCount: string;
+  createdAt: string;
+}
+
 @Observed
 export class AuthService {
   private static instance: AuthService;
@@ -75,7 +118,7 @@ export class AuthService {
       }
 
       // 注册（id 用手机号，方便 login 时查询）
-      const userData = {
+      const userData: RegisterUserData = {
         id: phone.trim(),
         username: username.trim(),
         phone: phone.trim(),
@@ -122,7 +165,7 @@ export class AuthService {
       const res = await UserApi.getUser(phone.trim());
 
       if (res.code === 0 && res.data) {
-        const userData = res.data as Record<string, Object>;
+        const userData = res.data as RegisterUserData;
 
         // ⚠️ 本地比对密码（生产环境应由云函数做服务端验证）
         const storedPassword = userData.password as string || '';
@@ -165,7 +208,7 @@ export class AuthService {
       const savedInfo = pref.getSync(KEY_USER_INFO, '') as string;
 
       if (savedId && savedInfo) {
-        const data = JSON.parse(savedInfo) as Record<string, string>;
+        const data = JSON.parse(savedInfo) as RegisterUserData;
         const user = this.buildUserModel(data);
         AppStorage.setOrCreate('currentUser', user);
         AppStorage.setOrCreate('currentUserId', user.id);
@@ -181,7 +224,7 @@ export class AuthService {
     try {
       const pref = await preferences.getPreferences(getContext(), PREF_NAME);
       await pref.put(KEY_USER_ID, user.id);
-      await pref.put(KEY_USER_INFO, JSON.stringify({
+      const sessionData: SessionData = {
         id: user.id, name: user.name, avatar: user.avatar,
         bio: user.bio, college: user.college, major: user.major,
         grade: user.grade, reputation: String(user.reputation),
@@ -191,12 +234,13 @@ export class AuthService {
         followerCount: String(user.followerCount),
         followingCount: String(user.followingCount),
         createdAt: user.createdAt
-      }));
+      };
+      await pref.put(KEY_USER_INFO, JSON.stringify(sessionData));
       await pref.flush();
     } catch (e) { /* ignore */ }
   }
 
-  private buildUserModel(data: Record<string, Object>): UserModel {
+  private buildUserModel(data: RegisterUserData): UserModel {
     const u = new UserModel();
     u.id = (data.id || data.phone || '') as string;
     u.name = (data.username || data.name || '') as string;
