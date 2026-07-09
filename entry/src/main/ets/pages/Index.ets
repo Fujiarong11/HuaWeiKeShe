@@ -53,11 +53,6 @@ struct Index {
   }
 
   onPageShow(): void {
-    // 响应切Tab请求
-    if (this.switchToTab >= 0) {
-      this.currentIndex = this.switchToTab;
-      AppStorage.setOrCreate('switchToTab', -1);
-    }
     // 每次显示页面时刷新未读通知数
     if (this.currentUserId) {
       getUnreadNotificationCount(this.currentUserId).then((count: number) => {
@@ -96,7 +91,18 @@ struct Index {
       .height('100%')
       .justifyContent(FlexAlign.Center)
     } else {
-      Tabs({ index: this.currentIndex, barPosition: BarPosition.End }) {
+      Column() {
+        // 响应 switchToTab 变化，切换到目标 Tab
+        Text('')
+          .width(0).height(0).fontSize(0)
+          .id(`switch_${this.switchToTab}`)
+          .onAppear(() => {
+            if (this.switchToTab >= 0 && this.switchToTab !== this.currentIndex) {
+              this.currentIndex = this.switchToTab;
+            }
+          })
+
+        Tabs({ index: this.currentIndex, barPosition: BarPosition.End }) {
         TabContent() {
           HomePage()
         }
@@ -135,6 +141,8 @@ struct Index {
       })
       .width('100%')
       .height('100%')
+    }
+    .width('100%').height('100%')
     }
   }
 

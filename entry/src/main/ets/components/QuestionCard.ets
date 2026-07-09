@@ -12,6 +12,7 @@ export struct QuestionCard {
   @ObjectLink question: QuestionModel;
   @Prop showTopicTags: boolean = true;
   onCardClick?: () => void;
+  onAuthorClick?: (userId: string) => void;
 
   build() {
     Column() {
@@ -57,12 +58,17 @@ export struct QuestionCard {
 
       // 底部信息
       Row() {
-        // 作者
+        // 作者（双击进入主页）
         UserInfoBar({
           user: this.question.author,
           avatarSize: 24,
           showReputation: false,
-          showTime: this.question.formattedTime
+          showTime: this.question.formattedTime,
+          onUserClick: (userId: string) => {
+            if (this.onAuthorClick) {
+              this.onAuthorClick(userId);
+            }
+          }
         })
 
         Blank()

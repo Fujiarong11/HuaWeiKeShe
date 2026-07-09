@@ -31,13 +31,18 @@ export struct AnswerCard {
         .margin({ bottom: 10 })
       }
 
-      // 作者信息栏
+      // 作者信息栏（双击进入主页）
       Row() {
         UserInfoBar({
           user: this.answer.author,
           avatarSize: 32,
           showReputation: true,
-          showTime: this.answer.formattedTime
+          showTime: this.answer.formattedTime,
+          onUserClick: (userId: string) => {
+            if (this.onAuthorClick) {
+              this.onAuthorClick(userId);
+            }
+          }
         })
 
         // 采纳按钮（仅问题作者可见）
@@ -57,11 +62,6 @@ export struct AnswerCard {
         }
       }
       .width('100%')
-      .onClick(() => {
-        if (this.onAuthorClick) {
-          this.onAuthorClick(this.answer.author.id);
-        }
-      })
 
       // 回答内容
       Text(this.answer.content)

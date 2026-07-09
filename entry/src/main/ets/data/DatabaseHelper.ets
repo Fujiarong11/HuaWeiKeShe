@@ -29,6 +29,7 @@ const SQL_CREATE_USERS: string = `
     totalQuestions INTEGER DEFAULT 0,
     followerCount INTEGER DEFAULT 0,
     followingCount INTEGER DEFAULT 0,
+    followedTopicIds TEXT DEFAULT '[]',
     createdAt TEXT DEFAULT ''
   )
 `;
@@ -90,6 +91,7 @@ export interface UserRow {
   totalQuestions: number;
   followerCount: number;
   followingCount: number;
+  followedTopicIds: string;
   createdAt: string;
 }
 
@@ -147,6 +149,14 @@ export class DatabaseHelper {
     try {
       DatabaseHelper.store = await relationalStore.getRdbStore(context, STORE_CONFIG);
       await DatabaseHelper.store.executeSql(SQL_CREATE_USERS);
+      // 兼容旧数据库：如果 followedTopicIds 列不存在则添加
+      try {
+        await DatabaseHelper.store.executeSql(
+          "ALTER TABLE users ADD COLUMN followedTopicIds TEXT DEFAULT '[]'"
+        );
+      } catch (_e) {
+        // 列已存在则忽略
+      }
       await DatabaseHelper.store.executeSql(SQL_CREATE_QUESTIONS);
       await DatabaseHelper.store.executeSql(SQL_CREATE_ANSWERS);
       DatabaseHelper.initialized = true;
@@ -176,6 +186,7 @@ export class DatabaseHelper {
       totalQuestions: user.totalQuestions,
       followerCount: user.followerCount,
       followingCount: user.followingCount,
+      followedTopicIds: user.followedTopicIds,
       createdAt: user.createdAt
     };
     const rowId: number = await DatabaseHelper.store.insert('users', bucket);
@@ -217,9 +228,35 @@ export class DatabaseHelper {
       totalQuestions: user.totalQuestions,
       followerCount: user.followerCount,
       followingCount: user.followingCount,
+      followedTopicIds: user.followedTopicIds,
     };
     const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('users');
     predicates.equalTo('id', user.id);
+    const rows: number = await DatabaseHelper.store.update(bucket, predicates);
+    return rows;
+  }
+
+  /** 仅更新用户的关注/粉丝计数 */
+  static async updateUserFollowStats(userId: string, followingCount: number, followerCount: number): Promise<number> {
+    if (!DatabaseHelper.store) { return -1; }
+    const bucket: relationalStore.ValuesBucket = {
+      followingCount: followingCount,
+      followerCount: followerCount,
+    };
+    const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('users');
+    predicates.equalTo('id', userId);
+    const rows: number = await DatabaseHelper.store.update(bucket, predicates);
+    return rows;
+  }
+
+  /** 仅更新用户的关注话题列表 */
+  static async updateUserFollowedTopics(userId: string, followedTopicIds: string): Promise<number> {
+    if (!DatabaseHelper.store) { return -1; }
+    const bucket: relationalStore.ValuesBucket = {
+      followedTopicIds: followedTopicIds,
+    };
+    const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('users');
+    predicates.equalTo('id', userId);
     const rows: number = await DatabaseHelper.store.update(bucket, predicates);
     return rows;
   }
@@ -366,6 +403,22 @@ export class DatabaseHelper {
     return rows;
   }
 
+  static async deleteAnswer(id: string): Promise<number> {
+    if (!DatabaseHelper.store) { return -1; }
+    const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('answers');
+    predicates.equalTo('id', id);
+    const rows: number = await DatabaseHelper.store.delete(predicates);
+    return rows;
+  }
+
+  static async deleteAnswersByQuestionId(questionId: string): Promise<number> {
+    if (!DatabaseHelper.store) { return -1; }
+    const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('answers');
+    predicates.equalTo('questionId', questionId);
+    const rows: number = await DatabaseHelper.store.delete(predicates);
+    return rows;
+  }
+
   // ========== ResultSet 读取辅助方法 ==========
 
   private static readFirstUser(resultSet: relationalStore.ResultSet): UserRow | null {
@@ -387,6 +440,7 @@ export class DatabaseHelper {
         totalQuestions: resultSet.getLong(resultSet.getColumnIndex('totalQuestions')),
         followerCount: resultSet.getLong(resultSet.getColumnIndex('followerCount')),
         followingCount: resultSet.getLong(resultSet.getColumnIndex('followingCount')),
+        followedTopicIds: DatabaseHelper.safeGetString(resultSet, 'followedTopicIds', '[]'),
         createdAt: resultSet.getString(resultSet.getColumnIndex('createdAt'))
       };
       return row;
@@ -449,5 +503,17 @@ export class DatabaseHelper {
       commentCount: resultSet.getLong(resultSet.getColumnIndex('commentCount')),
       createdAt: resultSet.getString(resultSet.getColumnIndex('createdAt'))
     };
+  }
+
+  /**
+   * 安全读取字符串列（兼容旧数据库缺少列的情况）
+   */
+  private static safeGetString(resultSet: relationalStore.ResultSet, column: string, fallback: string): string {
+    try {
+      const result: string = resultSet.getString(resultSet.getColumnIndex(column));
+      return result;
+    } catch (_e) {
+      return fallback;
+    }
   }
 }

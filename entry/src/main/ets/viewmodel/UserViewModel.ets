@@ -12,6 +12,8 @@ import { router } from '@kit.ArkUI';
 import {
   getUserById,
   toggleFollowUser,
+  getFollowingUsers,
+  getFollowerUsers,
   getStore
 } from '../mock/MockData';
 
@@ -193,19 +195,26 @@ export class UserViewModel {
     if (updated) {
       this.viewingUser = updated;
     }
+    // 刷新 currentUser 以同步关注数和粉丝数到 UI
+    const store = getStore();
+    const refreshed = store.users.find(u => u.id === this.currentUser!.id);
+    if (refreshed) {
+      this.currentUser = refreshed;
+      AppStorage.setOrCreate('currentUser', refreshed);
+    }
   }
 
   /**
    * 加载关注/粉丝列表
    */
   async loadFollowList(type: 'followers' | 'following', userId: string): Promise<void> {
-    const store = getStore();
-    // 简化处理：返回内存 store 中的用户
-    const users: UserModel[] = [];
-    for (const u of store.users) {
-      if (u.id !== userId) { users.push(u); }
+    let users: UserModel[] = [];
+    if (type === 'following') {
+      users = await getFollowingUsers(userId);
+    } else {
+      users = await getFollowerUsers(userId);
     }
-    this.userListDataSource.reloadData(users.slice(0, 15));
+    this.userListDataSource.reloadData(users);
   }
 
   /**

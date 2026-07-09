@@ -18,7 +18,6 @@ export struct HomePage {
   private viewModel: HomeViewModel = HomeViewModel.getInstance();
   @State currentTab: number = 0;
   @State dataVersion: number = 0;
-  private lastRefreshTrigger: number = 0;
   private tabTitles: string[] = ['推荐', '热门', '最新', '关注'];
   private tabTypes: HomeTabType[] = [
     HomeTabType.RECOMMEND,
@@ -31,18 +30,16 @@ export struct HomePage {
     await this.loadData();
   }
 
-  onPageShow(): void {
-    this.loadData();
-    // 检查是否需要刷新（其他页面发布新问题后触发）
-    if (this.homeRefreshTrigger !== this.lastRefreshTrigger) {
-      this.lastRefreshTrigger = this.homeRefreshTrigger;
-      this.loadData();
-    }
-  }
-
-  // 监听 AppStorage 中的刷新触发器（其他页面发布新问题后会触发）
   build() {
     Column() {
+      // 响应 homeRefreshTrigger 变化，刷新数据
+      Text('')
+        .width(0).height(0).fontSize(0)
+        .id(`home_${this.homeRefreshTrigger}`)
+        .onAppear(() => {
+          this.loadData();
+        })
+
       // 顶部搜索栏
       Row() {
         Text('校园问答')

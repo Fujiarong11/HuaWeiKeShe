@@ -4,6 +4,7 @@
     "pages/LoginPage",
     "pages/QuestionDetailPage",
     "pages/SearchPage",
-    "pages/UserProfilePage"
+    "pages/UserProfilePage",
+    "pages/FollowListPage"
   ]
 }

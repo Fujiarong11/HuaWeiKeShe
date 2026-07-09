@@ -103,12 +103,19 @@ export struct QuestionDetailPage {
                   })
                 }.width('100%').margin({ top: 12 })
 
-                // 作者 + 统计
+                // 作者 + 统计（双击作者进入主页）
                 Row() {
                   UserInfoBar({
                     user: this.viewModel.currentQuestion.author,
                     avatarSize: 28,
-                    showTime: this.viewModel.currentQuestion.formattedTime
+                    showTime: this.viewModel.currentQuestion.formattedTime,
+                    onUserClick: (userId: string) => {
+                      AppStorage.setOrCreate('targetUserId', userId);
+                      router.pushUrl({
+                        url: 'pages/UserProfilePage',
+                        params: { userId: userId }
+                      });
+                    }
                   })
                   Blank()
                   Text(`${this.viewModel.currentQuestion.viewCount} 次浏览`)
@@ -249,6 +256,8 @@ export struct QuestionDetailPage {
                   if (ok) {
                     this.answerText = '';
                     this.showAnswerInput = false;
+                    // 重新加载回答列表确保 UI 刷新
+                    await this.viewModel.loadAnswers(this.questionId);
                     this.dataVersion++;
                   }
                 })

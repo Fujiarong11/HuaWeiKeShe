@@ -1,8 +1,10 @@
 /**
  * 用户信息条组件
  * 显示头像、姓名、声望等信息
+ * 支持双击跳转到用户主页
  */
 import { UserModel } from '../model/UserModel';
+import { router } from '@kit.ArkUI';
 
 @Component
 export struct UserInfoBar {
@@ -10,6 +12,7 @@ export struct UserInfoBar {
   @Prop showReputation: boolean = true;
   @Prop avatarSize: number = 36;
   @Prop showTime: string = '';
+  onUserClick?: (userId: string) => void;
 
   build() {
     Row() {
@@ -66,6 +69,23 @@ export struct UserInfoBar {
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)
+    .gesture(
+      TapGesture({ count: 2 })
+        .onAction(() => {
+          if (this.user && this.user.id) {
+            if (this.onUserClick) {
+              this.onUserClick(this.user.id);
+            } else {
+              // 默认行为：跳转到用户主页
+              AppStorage.setOrCreate('targetUserId', this.user.id);
+              router.pushUrl({
+                url: 'pages/UserProfilePage',
+                params: { userId: this.user.id }
+              });
+            }
+          }
+        })
+    )
   }
 
   /**

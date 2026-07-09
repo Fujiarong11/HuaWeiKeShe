@@ -138,6 +138,15 @@ class MockDataStore {
    * 确保用户数据在内存 store 中存在，以便后续操作能找到 author
    */
   syncUserFromDb(userRow: UserRow): UserModel {
+    // 解析关注话题 ID 列表
+    let followedIds: string[] = [];
+    try {
+      const parsed: Object = JSON.parse(userRow.followedTopicIds) as Object;
+      followedIds = parsed as string[];
+    } catch (_e) {
+      followedIds = [];
+    }
+
     const existing: UserModel | undefined = this.users.find(u => u.id === userRow.id);
     if (existing) {
       existing.name = userRow.name || userRow.username;
@@ -152,6 +161,8 @@ class MockDataStore {
       existing.totalQuestions = userRow.totalQuestions;
       existing.followerCount = userRow.followerCount;
       existing.followingCount = userRow.followingCount;
+      existing.followedTopicIds = followedIds;
+      this.restoreTopicFollowState(followedIds);
       return existing;
     }
     const u: UserModel = new UserModel();
@@ -169,8 +180,22 @@ class MockDataStore {
     u.followerCount = userRow.followerCount;
     u.followingCount = userRow.followingCount;
     u.createdAt = userRow.createdAt;
+    u.followedTopicIds = followedIds;
     this.users.push(u);
+    this.restoreTopicFollowState(followedIds);
     return u;
+  }
+
+  /**
+   * 根据用户已关注的话题 ID 列表，恢复 topics 中的 isFollowed 状态
+   */
+  private restoreTopicFollowState(followedIds: string[]): void {
+    for (const tid of followedIds) {
+      const topic: TopicModel | undefined = this.topics.find(t => t.id === tid);
+      if (topic) {
+        topic.isFollowed = true;
+      }
+    }
   }
 
   // ========== Row → Model 转换 ==========
@@ -494,6 +519,7 @@ export async function postQuestion(title: string, content: string, topicIds: str
       totalQuestions: author.totalQuestions,
       followerCount: author.followerCount,
       followingCount: author.followingCount,
+      followedTopicIds: JSON.stringify(author.followedTopicIds),
       createdAt: author.createdAt
     });
   }
@@ -521,6 +547,148 @@ export async function toggleQuestionCollect(questionId: string): Promise<Questio
     q.followerCount += q.isCollected ? 1 : -1;
   }
   return q;
+}
+
+// ========== 删除操作 ==========
+
+export async function deleteQuestion(questionId: string): Promise<boolean> {
+  await delay(100);
+  const store: MockDataStore = getStore();
+  const qIdx: number = store.questions.findIndex(q => q.id === questionId);
+  if (qIdx < 0) { return false; }
+  const question: QuestionModel = store.questions[qIdx];
+
+  // 1. 从内存删除关联回答
+  const remaining: AnswerModel[] = [];
+  for (const a of store.answers) {
+    if (a.questionId !== questionId) {
+      remaining.push(a);
+    }
+  }
+  store.answers = remaining;
+
+  // 2. 从内存删除问题
+  const newQuestions: QuestionModel[] = [];
+  for (let i = 0; i < store.questions.length; i++) {
+    if (i !== qIdx) { newQuestions.push(store.questions[i]); }
+  }
+  store.questions = newQuestions;
+
+  // 3. 更新作者的总提问数
+  const author: UserModel | undefined = store.users.find(u => u.id === question.author.id);
+  if (author && author.totalQuestions > 0) {
+    author.totalQuestions--;
+  }
+
+  // 4. 更新话题的问题数
+  for (const tid of question.topicIds) {
+    const topic: TopicModel | undefined = store.topics.find(t => t.id === tid);
+    if (topic && topic.questionCount > 0) {
+      topic.questionCount--;
+    }
+  }
+
+  // 5. 持久化：删除 DB 中的回答和问题
+  await DatabaseHelper.deleteAnswersByQuestionId(questionId);
+  await DatabaseHelper.deleteQuestion(questionId);
+
+  // 6. 更新作者数据到 DB
+  if (author) {
+    DatabaseHelper.updateUser({
+      id: author.id,
+      phone: author.id,
+      username: author.name,
+      password: '',
+      name: author.name,
+      avatar: author.avatar,
+      bio: author.bio,
+      college: author.college,
+      major: author.major,
+      grade: author.grade,
+      reputation: author.reputation,
+      acceptedCount: author.acceptedCount,
+      totalAnswers: author.totalAnswers,
+      totalQuestions: author.totalQuestions,
+      followerCount: author.followerCount,
+      followingCount: author.followingCount,
+      followedTopicIds: JSON.stringify(author.followedTopicIds),
+      createdAt: author.createdAt
+    });
+  }
+
+  return true;
+}
+
+export async function deleteAnswer(answerId: string): Promise<boolean> {
+  await delay(100);
+  const store: MockDataStore = getStore();
+  const aIdx: number = store.answers.findIndex(a => a.id === answerId);
+  if (aIdx < 0) { return false; }
+  const answer: AnswerModel = store.answers[aIdx];
+
+  // 1. 从内存删除回答
+  const remaining: AnswerModel[] = [];
+  for (let i = 0; i < store.answers.length; i++) {
+    if (i !== aIdx) { remaining.push(store.answers[i]); }
+  }
+  store.answers = remaining;
+
+  // 2. 更新问题的回答数
+  const question: QuestionModel | undefined = store.questions.find(q => q.id === answer.questionId);
+  if (question && question.answerCount > 0) {
+    question.answerCount--;
+  }
+
+  // 3. 更新作者的总回答数
+  const author: UserModel | undefined = store.users.find(u => u.id === answer.author.id);
+  if (author && author.totalAnswers > 0) {
+    author.totalAnswers--;
+  }
+
+  // 4. 持久化
+  await DatabaseHelper.deleteAnswer(answerId);
+  if (question) {
+    DatabaseHelper.updateQuestion({
+      id: question.id,
+      title: question.title,
+      content: question.content,
+      authorId: question.author.id,
+      authorName: question.author.name,
+      authorAvatar: question.author.avatar,
+      topicIds: JSON.stringify(question.topicIds),
+      status: question.status === QuestionStatus.RESOLVED ? 'RESOLVED' : 'OPEN',
+      viewCount: question.viewCount,
+      likeCount: question.likeCount,
+      followerCount: question.followerCount,
+      answerCount: question.answerCount,
+      createdAt: question.createdAt,
+      updatedAt: question.updatedAt
+    });
+  }
+  if (author) {
+    DatabaseHelper.updateUser({
+      id: author.id,
+      phone: author.id,
+      username: author.name,
+      password: '',
+      name: author.name,
+      avatar: author.avatar,
+      bio: author.bio,
+      college: author.college,
+      major: author.major,
+      grade: author.grade,
+      reputation: author.reputation,
+      acceptedCount: author.acceptedCount,
+      totalAnswers: author.totalAnswers,
+      totalQuestions: author.totalQuestions,
+      followerCount: author.followerCount,
+      followingCount: author.followingCount,
+      followedTopicIds: JSON.stringify(author.followedTopicIds),
+      createdAt: author.createdAt
+    });
+  }
+
+  return true;
 }
 
 // ========== 回答相关 API ==========
@@ -598,6 +766,7 @@ export async function postAnswer(questionId: string, content: string, authorId: 
       totalQuestions: author.totalQuestions,
       followerCount: author.followerCount,
       followingCount: author.followingCount,
+      followedTopicIds: JSON.stringify(author.followedTopicIds),
       createdAt: author.createdAt
     });
   }
@@ -654,6 +823,7 @@ export async function acceptAnswer(answerId: string): Promise<AnswerModel | unde
         totalQuestions: author.totalQuestions,
         followerCount: author.followerCount,
         followingCount: author.followingCount,
+        followedTopicIds: JSON.stringify(author.followedTopicIds),
         createdAt: author.createdAt
       });
     }
@@ -762,6 +932,8 @@ export async function toggleTopicFollow(topicId: string, userId: string): Promis
       }
       user.followedTopicIds = newIds;
     }
+    // 持久化到数据库
+    DatabaseHelper.updateUserFollowedTopics(userId, JSON.stringify(user.followedTopicIds));
   }
   return topic;
 }
@@ -800,10 +972,85 @@ export async function toggleFollowUser(targetUserId: string, currentUserId: stri
   const target: UserModel | undefined = store.users.find(u => u.id === targetUserId);
   const current: UserModel | undefined = store.users.find(u => u.id === currentUserId);
   if (target && current) {
-    target.followerCount += 1;
-    current.followingCount += 1;
+    const isFollowing: boolean = current.followedUserIds.includes(targetUserId);
+    if (isFollowing) {
+      // 取消关注
+      const newFollowed: string[] = [];
+      for (const id of current.followedUserIds) {
+        if (id !== targetUserId) { newFollowed.push(id); }
+      }
+      current.followedUserIds = newFollowed;
+      current.followingCount = newFollowed.length;
+
+      const newFollowers: string[] = [];
+      for (const id of target.followerUserIds) {
+        if (id !== currentUserId) { newFollowers.push(id); }
+      }
+      target.followerUserIds = newFollowers;
+      target.followerCount = newFollowers.length;
+    } else {
+      // 关注
+      const newFollowed: string[] = [];
+      for (const id of current.followedUserIds) { newFollowed.push(id); }
+      newFollowed.push(targetUserId);
+      current.followedUserIds = newFollowed;
+      current.followingCount = newFollowed.length;
+
+      const newFollowers: string[] = [];
+      for (const id of target.followerUserIds) { newFollowers.push(id); }
+      newFollowers.push(currentUserId);
+      target.followerUserIds = newFollowers;
+      target.followerCount = newFollowers.length;
+    }
+
+    // 持久化关注/粉丝计数到数据库
+    DatabaseHelper.updateUserFollowStats(currentUserId, current.followingCount, current.followerCount);
+    DatabaseHelper.updateUserFollowStats(targetUserId, target.followingCount, target.followerCount);
   }
   return target;
+}
+
+/**
+ * 检查当前用户是否关注了目标用户
+ */
+export async function isFollowingUser(currentUserId: string, targetUserId: string): Promise<boolean> {
+  await delay(50);
+  const store: MockDataStore = getStore();
+  const current: UserModel | undefined = store.users.find(u => u.id === currentUserId);
+  if (!current) { return false; }
+  return current.followedUserIds.includes(targetUserId);
+}
+
+/**
+ * 获取用户关注的人列表
+ */
+export async function getFollowingUsers(userId: string): Promise<UserModel[]> {
+  await delay();
+  const store: MockDataStore = getStore();
+  const user: UserModel | undefined = store.users.find(u => u.id === userId);
+  if (!user) { return []; }
+  const result: UserModel[] = [];
+  for (const id of user.followedUserIds) {
+    const u: UserModel | undefined = store.users.find(u => u.id === id);
+    if (u) { result.push(u); }
+  }
+  return result;
+}
+
+/**
+ * 获取关注用户的粉丝列表
+ */
+export async function getFollowerUsers(userId: string): Promise<UserModel[]> {
+  await delay();
+  const store: MockDataStore = getStore();
+  const user: UserModel | undefined = store.users.find(u => u.id === userId);
+  if (!user) { return []; }
+  const result: UserModel[] = [];
+  for (const id of user.followerUserIds) {
+    const u: UserModel | undefined = store.users.find(u => u.id === id);
+    if (u) { result.push(u); }
+  }
+  return result;
 }
 
 // ========== 通知相关 API ==========

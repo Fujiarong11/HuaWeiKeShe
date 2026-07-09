@@ -44,6 +44,7 @@ interface RegisterUserData {
   totalQuestions: number;
   followerCount: number;
   followingCount: number;
+  followedTopicIds: string;
   createdAt: string;
 }
 
@@ -135,6 +136,7 @@ export class AuthService {
         totalQuestions: 0,
         followerCount: 0,
         followingCount: 0,
+        followedTopicIds: '[]',
         createdAt: new Date().toISOString()
       };
 
@@ -256,6 +258,12 @@ export class AuthService {
     u.followerCount = (data.followerCount || 0) as number;
     u.followingCount = (data.followingCount || 0) as number;
     u.createdAt = (data.createdAt || '') as string;
+    try {
+      const parsed: Object = JSON.parse((data.followedTopicIds || '[]') as string) as Object;
+      u.followedTopicIds = parsed as string[];
+    } catch (_e) {
+      u.followedTopicIds = [];
+    }
     return u;
   }
 }

@@ -6,6 +6,7 @@ import { QuestionModel } from '../model/QuestionModel';
 import { AnswerModel } from '../model/AnswerModel';
 import { QuestionCard } from '../components/QuestionCard';
 import { UserViewModel } from '../viewmodel/UserViewModel';
+import { isFollowingUser } from '../mock/MockData';
 import { router } from '@kit.ArkUI';
 
 @Entry
@@ -16,6 +17,7 @@ export struct UserProfilePage {
   private userVM: UserViewModel = UserViewModel.getInstance();
   @State activeTab: number = 0;
   @State dataVersion: number = 0;
+  @State isFollowing: boolean = false;
 
   async aboutToAppear(): Promise<void> {
     if (this.userId) {
@@ -26,6 +28,10 @@ export struct UserProfilePage {
       const answers = store.answers.filter(a => a.author.id === this.userId);
       this.userVM.userQuestions.reloadData(questions);
       this.userVM.userAnswers.reloadData(answers);
+      // 检查关注状态
+      if (this.currentUserId && this.userId !== this.currentUserId) {
+        this.isFollowing = await isFollowingUser(this.currentUserId, this.userId);
+      }
       this.dataVersion++;
     }
   }
@@ -64,11 +70,22 @@ export struct UserProfilePage {
 
               if (this.userVM.viewingUser.id !== this.currentUserId) {
                 Row() {
-                  Button('+ 关注')
-                    .fontSize(14).fontColor(Color.White)
-                    .backgroundColor('#4A90D9').borderRadius(20)
+                  Button(this.isFollowing ? '已关注' : '+ 关注')
+                    .fontSize(14)
+                    .fontColor(this.isFollowing ? '#999' : Color.White)
+                    .backgroundColor(this.isFollowing ? '#F0F0F0' : '#4A90D9')
+                    .borderRadius(20)
                     .height(34).padding({ left: 24, right: 24 })
-                    .onClick(() => { this.userVM.toggleFollow(this.userId); })
+                    .border(this.isFollowing ? {
+                      width: 1, color: '#DDD', style: BorderStyle.Solid
+                    } : { width: 0 })
+                    .onClick(async () => {
+                      await this.userVM.toggleFollow(this.userId);
+                      this.isFollowing = !this.isFollowing;
+                      // 刷新用户数据以更新粉丝/关注计数
+                      await this.userVM.loadUserProfile(this.userId);
+                      this.dataVersion++;
+                    })
                   Button('私信')
                     .fontSize(14).fontColor('#4A90D9')
                     .backgroundColor(Color.White).borderRadius(20)
@@ -86,8 +103,30 @@ export struct UserProfilePage {
               this.StatItem('声望', this.userVM.viewingUser.reputation)
               this.StatItem('采纳率', `${this.userVM.viewingUser.acceptanceRate}%`)
               this.StatItem('回答', this.userVM.viewingUser.totalAnswers)
-              this.StatItem('关注', this.userVM.viewingUser.followingCount)
-              this.StatItem('粉丝', this.userVM.viewingUser.followerCount)
+              Column() {
+                Text(`${this.userVM.viewingUser.followingCount}`)
+                  .fontSize(16).fontWeight(FontWeight.Bold).fontColor('#1A1A1A')
+                Text('关注').fontSize(11).fontColor('#999').margin({ top: 3 })
+              }
+              .alignItems(HorizontalAlign.Center)
+              .onClick(() => {
+                router.pushUrl({
+                  url: 'pages/FollowListPage',
+                  params: { mode: 'following', userId: this.userId }
+                });
+              })
+              Column() {
+                Text(`${this.userVM.viewingUser.followerCount}`)
+                  .fontSize(16).fontWeight(FontWeight.Bold).fontColor('#1A1A1A')
+                Text('粉丝').fontSize(11).fontColor('#999').margin({ top: 3 })
+              }
+              .alignItems(HorizontalAlign.Center)
+              .onClick(() => {
+                router.pushUrl({
+                  url: 'pages/FollowListPage',
+                  params: { mode: 'followers', userId: this.userId }
+                });
+              })
             }
             .width('100%').padding(16).backgroundColor(Color.White).borderRadius(12)
             .margin({ left: 16, right: 16, top: 10 })
