@@ -1,13 +1,11 @@
 /**
  * 认证服务层
- * 对接腾讯云 CloudBase 云函数 scfnodejshelloworld
+ * 对接 Spring Boot 后端 HTTP API
  *
- * 云函数接口（你的实际云函数）：
- *   userRegister  - 注册: { action: "userRegister", data: { id, username, password, ... } }
- *   getUser       - 查用户: { action: "getUser", data: { id } }
- *
- * ⚠️ 注意：当前云函数没有服务端密码验证，登录时通过 getUser 查询后本地比对。
- *    建议后续在云函数中添加 login action 做服务端密码校验 + token 签发。
+ * 后端接口：
+ *   POST /api/user/register  — 注册
+ *   POST /api/user/login      — 登录
+ *   GET  /api/user/getUser    — 查用户
  */
 import { preferences } from '@kit.ArkData';
 import { UserModel, LoginResult, RegisterResult } from '../model/UserModel';
@@ -28,7 +26,7 @@ const USERNAME_REGEX = /^[a-zA-Z0-9_一-龥]+$/;
  * 注册用户数据结构（用于对象字面量类型标注）
  */
 interface RegisterUserData {
-  id: string;
+  id: string | number;
   username: string;
   phone: string;
   password: string;
@@ -117,30 +115,15 @@ export class AuthService {
         return { success: false, error: '该手机号已被注册' };
       }
 
-      // 注册（id 用手机号，方便 login 时查询）
-      const userData: RegisterUserData = {
-        id: phone.trim(),
-        username: username.trim(),
+      // 调用后端注册接口
+      const res = await UserApi.userRegister({
         phone: phone.trim(),
-        password: password,                    // ⚠️ 明文存密码，生产环境需改为哈希
-        name: username.trim(),
-        avatar: '',
-        bio: '',
-        college: '',
-        major: '',
-        grade: '',
-        reputation: 0,
-        acceptedCount: 0,
-        totalAnswers: 0,
-        totalQuestions: 0,
-        followerCount: 0,
-        followingCount: 0,
-        createdAt: new Date().toISOString()
-      };
+        username: username.trim(),
+        password: password
+      });
 
-      const res = await UserApi.userRegister(userData);
-
-      if (res.code === 0) {
+      if (res.code === 0 && res.data) {
+        const userData = res.data as RegisterUserData;
         const user = this.buildUserModel(userData);
         await this.saveSession(user);
         AppStorage.setOrCreate('currentUser', user);
@@ -161,25 +144,18 @@ export class AuthService {
     if (err) return { success: false, error: err };
 
     try {
-      // 通过手机号（即 id）查询用户
-      const res = await UserApi.getUser(phone.trim());
+      // 调用后端登录接口（后端做 BCrypt 密码校验）
+      const res = await UserApi.userLogin(phone.trim(), password);
 
       if (res.code === 0 && res.data) {
         const userData = res.data as RegisterUserData;
-
-        // ⚠️ 本地比对密码（生产环境应由云函数做服务端验证）
-        const storedPassword = userData.password as string || '';
-        if (storedPassword !== password) {
-          return { success: false, error: '手机号或密码错误' };
-        }
-
         const user = this.buildUserModel(userData);
         await this.saveSession(user);
         AppStorage.setOrCreate('currentUser', user);
         AppStorage.setOrCreate('currentUserId', user.id);
         return { success: true, user, token: `token_${Date.now()}` };
       } else {
-        return { success: false, error: '手机号或密码错误' };
+        return { success: false, error: (res.msg || '手机号或密码错误') as string };
       }
     } catch (e) {
       return { success: false, error: '网络连接失败，请检查网络后重试' };
@@ -242,7 +218,7 @@ export class AuthService {
 
   private buildUserModel(data: RegisterUserData): UserModel {
     const u = new UserModel();
-    u.id = (data.id || data.phone || '') as string;
+    u.id = String(data.id || data.phone || '');
     u.name = (data.username || data.name || '') as string;
     u.avatar = (data.avatar || '') as string;
     u.bio = (data.bio || '') as string;
