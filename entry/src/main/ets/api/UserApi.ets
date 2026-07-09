@@ -35,6 +35,14 @@ export interface RegisterRequest {
 }
 
 /**
+ * 登录请求数据结构
+ */
+export interface LoginRequest {
+  phone: string;
+  password: string;
+}
+
+/**
  * 注册新用户
  * POST /api/user/register
  */
@@ -64,13 +72,14 @@ export async function userRegister(userData: RegisterRequest): Promise<ApiResult
  */
 export async function userLogin(phone: string, password: string): Promise<ApiResult> {
   try {
+    const loginData: LoginRequest = { phone, password };
     const request = http.createHttp();
     const response = await request.request(
       `${ApiConfig.BASE_URL}/api/user/login`,
       {
         method: http.RequestMethod.POST,
         header: { 'Content-Type': 'application/json' },
-        extraData: JSON.stringify({ phone, password }),
+        extraData: JSON.stringify(loginData),
         connectTimeout: 10000,
         readTimeout: 10000
       }
