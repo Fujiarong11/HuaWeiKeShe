@@ -8,8 +8,8 @@ import { PostQuestionPage } from '../question/PostQuestionPage';
 import { NotificationPage } from '../discover/NotificationPage';
 import { ProfilePage } from '../user/ProfilePage';
 import { UserViewModel } from '../../viewmodel/UserViewModel';
+import { UserModel } from '../../model/UserModel';
 import { getUnreadNotificationCount, getStore } from '../../mock/MockData';
-import { DatabaseHelper, UserRow } from '../../data/DatabaseHelper';
 import { router } from '@kit.ArkUI';
 
 @Entry
@@ -37,10 +37,9 @@ struct Index {
       const store = getStore();
       await store.loadFromDb();
 
-      // 3. 同步当前用户到内存 store（确保后续操作能找到 author）
-      const dbUser: UserRow | null = await DatabaseHelper.queryUserById(this.currentUserId);
-      if (dbUser) {
-        store.syncUserFromDb(dbUser);
+      // 3. 同步当前用户到内存 store（用户数据来自后端，确保后续操作能找到 author）
+      if (this.currentUser) {
+        store.syncUserFromModel(this.currentUser as UserModel);
       }
 
       // 加载未读通知数

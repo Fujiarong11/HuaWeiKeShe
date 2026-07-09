@@ -4,6 +4,7 @@
 @Observed
 export class UserModel {
   id: string = '';
+  phone: string = '';
   name: string = '';
   avatar: string = '';
   bio: string = '';

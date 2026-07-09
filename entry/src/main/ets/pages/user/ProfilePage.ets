@@ -7,7 +7,7 @@ import { QuestionModel, QuestionStatus } from '../../model/QuestionModel';
 import { AnswerModel } from '../../model/AnswerModel';
 import { QuestionCard } from '../../components/QuestionCard';
 import { UserViewModel } from '../../viewmodel/UserViewModel';
-import { DatabaseHelper, QuestionRow, AnswerRow, UserRow } from '../../data/DatabaseHelper';
+import { DatabaseHelper, QuestionRow, AnswerRow } from '../../data/DatabaseHelper';
 import { TopicModel } from '../../model/TopicModel';
 import { getStore, deleteQuestion, deleteAnswer } from '../../mock/MockData';
 import { router } from '@kit.ArkUI';
@@ -33,15 +33,12 @@ export struct ProfilePage {
   async onRefresh(): Promise<void> {
     this.isRefreshing = true;
     await this.loadUserContent();
+    // 刷新用户最新状态（从内存 store，登录时已从后端同步）
     if (this.currentUserId) {
       const store = getStore();
-      const dbUser: UserRow | null = await DatabaseHelper.queryUserById(this.currentUserId);
-      if (dbUser) {
-        store.syncUserFromDb(dbUser);
-        const user: UserModel | undefined = store.users.find(u => u.id === this.currentUserId);
-        if (user) {
-          AppStorage.setOrCreate('currentUser', user);
-        }
+      const user: UserModel | undefined = store.users.find(u => u.id === this.currentUserId);
+      if (user) {
+        AppStorage.setOrCreate('currentUser', user);
       }
     }
     this.isRefreshing = false;

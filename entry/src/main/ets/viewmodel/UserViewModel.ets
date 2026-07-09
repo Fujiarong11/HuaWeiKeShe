@@ -1,13 +1,16 @@
 /**
  * 用户 ViewModel
- * 处理用户登录、注册、个人主页、关注粉丝等逻辑
+ * 注册/登录走 Spring Boot 后端 HTTP API
+ * 问题/回答仍从本地 DB 加载（后端暂未支持）
  */
 import { UserModel } from '../model/UserModel';
 import { QuestionModel, QuestionStatus } from '../model/QuestionModel';
 import { AnswerModel } from '../model/AnswerModel';
 import { BasicDataSource } from '../common/datasource/BasicDataSource';
 import { AuthService } from '../services/AuthService';
-import { DatabaseHelper, UserRow, QuestionRow, AnswerRow } from '../data/DatabaseHelper';
+import { DatabaseHelper, QuestionRow, AnswerRow } from '../data/DatabaseHelper';
+import * as UserApi from '../api/UserApi';
+import type { ApiResult, UserResponse } from '../api/UserApi';
 import { router } from '@kit.ArkUI';
 import {
   getUserById,
@@ -225,10 +228,6 @@ export class UserViewModel {
    * 将用户同步到内存 store，确保后续发帖/回答能找到 author
    */
   private syncUserToStore(user: UserModel): void {
-    const store = getStore();
-    const existing: UserModel | undefined = store.users.find(u => u.id === user.id);
-    if (!existing) {
-      store.users.push(user);
-    }
+    getStore().syncUserFromModel(user);
   }
 }

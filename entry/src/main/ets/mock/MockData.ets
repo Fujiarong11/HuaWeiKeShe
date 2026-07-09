@@ -386,6 +386,35 @@ export class MockDataStore {
     return u;
   }
 
+  /**
+   * 从 UserModel 同步到内存 store（后端登录后调用）
+   * 如果已存在则合并更新，不存在则新增
+   */
+  syncUserFromModel(user: UserModel): UserModel {
+    const existing: UserModel | undefined = this.users.find(u => u.id === user.id);
+    if (existing) {
+      existing.phone = user.phone || existing.phone;
+      existing.name = user.name || existing.name;
+      existing.avatar = user.avatar || existing.avatar;
+      existing.bio = user.bio || existing.bio;
+      existing.college = user.college || existing.college;
+      existing.major = user.major || existing.major;
+      existing.grade = user.grade || existing.grade;
+      existing.reputation = user.reputation || existing.reputation;
+      existing.acceptedCount = user.acceptedCount || existing.acceptedCount;
+      existing.totalAnswers = user.totalAnswers || existing.totalAnswers;
+      existing.totalQuestions = user.totalQuestions || existing.totalQuestions;
+      existing.followerCount = user.followerCount || existing.followerCount;
+      existing.followingCount = user.followingCount || existing.followingCount;
+      existing.createdAt = user.createdAt || existing.createdAt;
+      this.restoreTopicFollowState(user.followedTopicIds);
+      return existing;
+    }
+    this.users.push(user);
+    this.restoreTopicFollowState(user.followedTopicIds);
+    return user;
+  }
+
   private restoreTopicFollowState(followedIds: string[]): void {
     for (const tid of followedIds) {
       const topic: TopicModel | undefined = this.topics.find(t => t.id === tid);

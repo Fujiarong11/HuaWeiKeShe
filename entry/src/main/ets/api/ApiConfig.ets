@@ -9,6 +9,6 @@
  *   3. MySQL 已启动
  */
 export class ApiConfig {
-  /** 后端 API 基础地址 */
-  static BASE_URL: string = 'http://172.20.10.5:8080';
+  /** 后端 API 基础地址（模拟器中 10.0.2.2 = 宿主机 localhost） */
+  static BASE_URL: string = 'http://10.0.2.2:8080';
 }

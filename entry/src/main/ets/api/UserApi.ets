@@ -1,9 +1,31 @@
 /**
- * 用户本地数据库 API
- * 使用 HarmonyOS RelationalStore 做注册登录
+ * 用户 API — 对接 Spring Boot 后端
+ *
+ * POST /api/user/register  { phone, username, password } → ApiResult<UserResponse>
+ * POST /api/user/login     { phone, password }             → ApiResult<UserResponse>
+ * GET  /api/user/getUser?phone=xxx                         → ApiResult<UserResponse>
  */
-import { DatabaseHelper } from '../data/DatabaseHelper';
-import type { UserRow } from '../data/DatabaseHelper';
+import { http } from '@kit.NetworkKit';
+import { ApiConfig } from './ApiConfig';
+
+// ========== 请求体接口 ==========
+
+interface RegisterBody {
+  phone: string;
+  username: string;
+  password: string;
+}
+
+interface LoginBody {
+  phone: string;
+  password: string;
+}
+
+interface HttpHeader {
+  'Content-Type': string;
+}
+
+// ========== 通用接口 ==========
 
 export interface ApiResult {
   code: number;
@@ -11,32 +33,90 @@ export interface ApiResult {
   data?: object;
 }
 
-/**
- * 注册新用户（写入本地数据库）
- */
-export async function userRegister(userData: UserRow): Promise<ApiResult> {
+/** 后端返回的用户数据 */
+export interface UserResponse {
+  id: number;
+  phone: string;
+  username: string;
+  name: string;
+  avatar: string;
+  bio: string;
+  college: string;
+  major: string;
+  grade: string;
+  reputation: number;
+  acceptedCount: number;
+  totalAnswers: number;
+  totalQuestions: number;
+  followerCount: number;
+  followingCount: number;
+  createdAt: string;
+}
+
+// ========== HTTP 工具 ==========
+
+function buildHeader(): HttpHeader {
+  const h: HttpHeader = { 'Content-Type': 'application/json' };
+  return h;
+}
+
+function buildApiError(msg: string): ApiResult {
+  const r: ApiResult = { code: -1, msg: msg };
+  return r;
+}
+
+async function httpPost(path: string, body: object): Promise<ApiResult> {
+  const req = http.createHttp();
+  const url: string = ApiConfig.BASE_URL + path;
+  const header: HttpHeader = buildHeader();
   try {
-    const rowId: number = await DatabaseHelper.insertUser(userData);
-    if (rowId >= 0) {
-      return { code: 0 };
-    }
-    return { code: -1, msg: '注册失败，请稍后重试' };
-  } catch (err) {
-    return { code: -1, msg: '该手机号已被注册' };
+    const resp = await req.request(url, {
+      method: http.RequestMethod.POST,
+      header: header,
+      extraData: JSON.stringify(body),
+      connectTimeout: 10000,
+      readTimeout: 10000
+    });
+    return JSON.parse(resp.result as string) as ApiResult;
+  } catch (_e) {
+    return buildApiError('网络连接失败，请确认后端已启动');
+  } finally {
+    req.destroy();
   }
 }
 
-/**
- * 根据手机号查询用户
- */
-export async function getUser(phone: string): Promise<ApiResult> {
+async function httpGet(path: string): Promise<ApiResult> {
+  const req = http.createHttp();
+  const url: string = ApiConfig.BASE_URL + path;
   try {
-    const row: UserRow | null = await DatabaseHelper.queryUserByPhone(phone);
-    if (row) {
-      return { code: 0, data: row as object };
-    }
-    return { code: -1, msg: '用户不存在' };
-  } catch (err) {
-    return { code: -1, msg: '查询失败' };
+    const resp = await req.request(url, {
+      method: http.RequestMethod.GET,
+      connectTimeout: 10000,
+      readTimeout: 10000
+    });
+    return JSON.parse(resp.result as string) as ApiResult;
+  } catch (_e) {
+    return buildApiError('网络连接失败，请确认后端已启动');
+  } finally {
+    req.destroy();
   }
+}
+
+// ========== 用户 API ==========
+
+/** 注册 */
+export async function userRegister(phone: string, username: string, password: string): Promise<ApiResult> {
+  const body: RegisterBody = { phone: phone, username: username, password: password };
+  return httpPost('/api/user/register', body);
+}
+
+/** 登录 */
+export async function userLogin(phone: string, password: string): Promise<ApiResult> {
+  const body: LoginBody = { phone: phone, password: password };
+  return httpPost('/api/user/login', body);
+}
+
+/** 按手机号查用户 */
+export async function getUser(phone: string): Promise<ApiResult> {
+  return httpGet('/api/user/getUser?phone=' + encodeURIComponent(phone));
 }
