@@ -127,7 +127,7 @@ struct HotQuestionCard {
           action: 'router',
           abilityName: 'EntryAbility',
           params: {
-            url: 'pages/question/QuestionDetailPage',
+            url: 'pages/question/tiezi',
             params: { questionId: qid }
           }
         });

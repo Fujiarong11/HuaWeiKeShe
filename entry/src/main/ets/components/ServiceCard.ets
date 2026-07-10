@@ -3,7 +3,7 @@
  * 展示热门问题排行 + 邀请回答提醒，可按浏览量排序
  */
 import { QuestionModel } from '../model/QuestionModel';
-import { getHotQuestions, getPendingInviteCount } from '../mock/MockData';
+import { getHotQuestions, getPendingInviteCount } from '../store/DataStore';
 import { router } from '@kit.ArkUI';
 
 @Component
@@ -100,7 +100,7 @@ export struct ServiceCard {
           .padding({ left: 16, right: 16, top: 6, bottom: 6 })
           .onClick(() => {
             router.pushUrl({
-              url: 'pages/question/QuestionDetailPage',
+              url: 'pages/question/tiezi',
               params: { questionId: q.id }
             });
           })

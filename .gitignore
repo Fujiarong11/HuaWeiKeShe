@@ -10,3 +10,8 @@ node_modules/
 /.clang-tidy
 **/.test
 /.appanalyzer
+
+# 敏感文件
+/密钥/
+/证书/
+/数据库/

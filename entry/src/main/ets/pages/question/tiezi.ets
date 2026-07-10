@@ -11,7 +11,7 @@ import { LoadingFooter } from '../../components/LoadingFooter';
 import { UserInfoBar } from '../../components/UserInfoBar';
 import { QuestionViewModel } from '../../viewmodel/QuestionViewModel';
 import { AnswerSortType } from '../../common/constants/CommonConstants';
-import { getStore } from '../../mock/MockData';
+import { getStore } from '../../store/DataStore';
 import { router } from '@kit.ArkUI';
 
 @Entry
@@ -123,7 +123,7 @@ export struct QuestionDetailPage {
                         const topicName = this.getTopicName(tid);
                         AppStorage.setOrCreate('searchKeyword', topicName);
                         router.pushUrl({
-                          url: 'pages/discover/SearchPage',
+                          url: 'pages/discover/sousuo',
                           params: { topicId: tid }
                         });
                       })
@@ -210,7 +210,7 @@ export struct QuestionDetailPage {
                           },
                           onAuthorClick: (uid: string) => {
                             AppStorage.setOrCreate('targetUserId', uid);
-                            router.pushUrl({ url: 'pages/user/UserProfilePage' });
+                            router.pushUrl({ url: 'pages/user/tarenzhuye' });
                           }
                         })
 
@@ -225,7 +225,7 @@ export struct QuestionDetailPage {
                                   comment: comment,
                                   onAuthorClick: (uid: string) => {
                                     AppStorage.setOrCreate('targetUserId', uid);
-                                    router.pushUrl({ url: 'pages/user/UserProfilePage' });
+                                    router.pushUrl({ url: 'pages/user/tarenzhuye' });
                                   }
                                 })
                                 },

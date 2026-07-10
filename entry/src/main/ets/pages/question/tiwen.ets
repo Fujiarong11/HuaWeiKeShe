@@ -3,7 +3,7 @@
  */
 import { TopicModel } from '../../model/TopicModel';
 import { TopicViewModel } from '../../viewmodel/TopicViewModel';
-import { postQuestion, getAllTopics } from '../../mock/MockData';
+import { postQuestion, getAllTopics } from '../../store/DataStore';
 import { promptAction } from '@kit.ArkUI';
 
 @Component

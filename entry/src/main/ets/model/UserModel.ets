@@ -53,16 +53,3 @@ export interface RegisterResult {
   user?: UserModel;
   error?: string;
 }
-
-/**
- * 声望变化记录
- */
-@Observed
-export class ReputationRecord {
-  id: string = '';
-  userId: string = '';
-  change: number = 0;
-  reason: string = '';
-  relatedId: string = '';
-  createdAt: string = '';
-}

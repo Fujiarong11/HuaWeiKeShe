@@ -2,14 +2,14 @@
  * 主入口页面 - Tab 导航容器
  * 包含首页、话题广场、发布、通知、个人中心五个 Tab
  */
-import { HomePage } from './HomePage';
-import { TopicSquarePage } from '../discover/TopicSquarePage';
-import { PostQuestionPage } from '../question/PostQuestionPage';
-import { NotificationPage } from '../discover/NotificationPage';
-import { ProfilePage } from '../user/ProfilePage';
+import { HomePage } from './shouye';
+import { TopicSquarePage } from '../discover/huatiguangchang';
+import { PostQuestionPage } from '../question/tiwen';
+import { NotificationPage } from '../discover/tongzhi';
+import { ProfilePage } from '../user/gerenzhongxin';
 import { UserViewModel } from '../../viewmodel/UserViewModel';
 import { UserModel } from '../../model/UserModel';
-import { getStore } from '../../mock/MockData';
+import { getStore } from '../../store/DataStore';
 import * as NotificationApi from '../../api/NotificationApi';
 import { router } from '@kit.ArkUI';
 
@@ -51,7 +51,7 @@ struct Index {
     } else {
       // 2. 未登录，跳转到登录页
       this.isCheckingAuth = false;
-      router.replaceUrl({ url: 'pages/login-register/LoginPage' });
+      router.replaceUrl({ url: 'pages/login-register/denglu' });
     }
   }
 

@@ -63,7 +63,7 @@ export struct TopicSquarePage {
                     .onClick(() => {
                       AppStorage.setOrCreate('searchKeyword', topic.name);
                       router.pushUrl({
-                        url: 'pages/discover/SearchPage',
+                        url: 'pages/discover/sousuo',
                         params: { topicId: topic.id }
                       });
                     })
@@ -92,7 +92,7 @@ export struct TopicSquarePage {
                 onCardClick: () => {
                   AppStorage.setOrCreate('searchKeyword', topic.name);
                   router.pushUrl({
-                    url: 'pages/discover/SearchPage',
+                    url: 'pages/discover/sousuo',
                     params: { topicId: topic.id }
                   });
                 },

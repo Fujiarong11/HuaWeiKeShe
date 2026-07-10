@@ -9,7 +9,7 @@ import { QuestionCard } from '../../components/QuestionCard';
 import { UserViewModel } from '../../viewmodel/UserViewModel';
 import { DatabaseHelper, AnswerRow } from '../../data/DatabaseHelper';
 import { TopicModel } from '../../model/TopicModel';
-import { getStore, deleteQuestion, deleteAnswer } from '../../mock/MockData';
+import { getStore, deleteQuestion, deleteAnswer } from '../../store/DataStore';
 import * as QuestionApi from '../../api/QuestionApi';
 import type { QuestionResponse } from '../../api/QuestionApi';
 import * as UserApi from '../../api/UserApi';
@@ -217,7 +217,7 @@ export struct ProfilePage {
                 .alignItems(HorizontalAlign.Center)
                 .onClick(() => {
                   router.pushUrl({
-                    url: 'pages/FollowListPage',
+                    url: 'pages/user/guanzhufensi',
                     params: { mode: 'following', userId: this.currentUserId }
                   });
                 })
@@ -229,7 +229,7 @@ export struct ProfilePage {
                 .alignItems(HorizontalAlign.Center)
                 .onClick(() => {
                   router.pushUrl({
-                    url: 'pages/FollowListPage',
+                    url: 'pages/user/guanzhufensi',
                     params: { mode: 'followers', userId: this.currentUserId }
                   });
                 })
@@ -283,13 +283,13 @@ export struct ProfilePage {
                       showTopicTags: true,
                       onCardClick: () => {
                         router.pushUrl({
-                          url: 'pages/question/QuestionDetailPage',
+                          url: 'pages/question/tiezi',
                           params: { questionId: question.id }
                         });
                       },
                       onAuthorClick: (userId: string) => {
                         AppStorage.setOrCreate('targetUserId', userId);
-                        router.pushUrl({ url: 'pages/user/UserProfilePage' });
+                        router.pushUrl({ url: 'pages/user/tarenzhuye' });
                       }
                     })
 
@@ -351,13 +351,13 @@ export struct ProfilePage {
                     showTopicTags: true,
                     onCardClick: () => {
                       router.pushUrl({
-                        url: 'pages/question/QuestionDetailPage',
+                        url: 'pages/question/tiezi',
                         params: { questionId: question.id }
                       });
                     },
                     onAuthorClick: (userId: string) => {
                       AppStorage.setOrCreate('targetUserId', userId);
-                      router.pushUrl({ url: 'pages/user/UserProfilePage' });
+                      router.pushUrl({ url: 'pages/user/tarenzhuye' });
                     }
                   })
                   .margin({ left: 16, right: 16, top: 6, bottom: 6 })

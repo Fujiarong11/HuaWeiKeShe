@@ -1,9 +1,21 @@
 /**
- * 集中式数据层
- * 内存 store + DatabaseHelper 持久化（问题、回答存 DB，话题为系统预设）
+ * ==================== 数据仓库（Store）====================
+ * 这是整个 App 的数据中枢，所有页面的数据最终都从这里读写。
  *
- * App 启动时从 DB 恢复数据到内存 store，运行时操作同步写 DB。
- * 注：此文件不再包含假数据种子，所有内容由真实用户产生。
+ * 数据来源三个渠道：
+ *   ① 种子数据 — 20个话题 + 3个预设用户 + 100条预设问题（App首次启动自动注入内存）
+ *   ② 后端 MySQL — 用户发的帖子/回答/评论 通过 HTTP API 读写
+ *   ③ 本地数据库 — RelationalStore 做离线缓存
+ *
+ * 数据流：
+ *   用户发布 → HTTP API → 后端 MySQL（主存储）
+ *                       ↓
+ *              内存 DataStore（当前会话缓存，首页直接读这里）
+ *
+ * 首页看到的帖子就来自 this.questions 数组：
+ *   - 预设的 100 条种子问题（seedQuestions）
+ *   - 用户自己发的帖子（postQuestion → 后端存 MySQL，同时 push 进此数组）
+ * ============================================================
  */
 import { UserModel } from '../model/UserModel';
 import { QuestionModel, QuestionStatus } from '../model/QuestionModel';
@@ -16,8 +28,10 @@ import type { QuestionResponse } from '../api/QuestionApi';
 import * as UserApi from '../api/UserApi';
 import type { UserResponse } from '../api/UserApi';
 
-// ============ 通知模型（内联定义）============
+// ==================== 内联数据模型 ====================
+// 通知和邀请两个模型只在本文件使用，不单独放 model/ 目录
 
+/** 通知条目 — 回答/评论/点赞/关注等消息 */
 @Observed
 export class NotificationItem {
   id: string = '';
@@ -33,8 +47,7 @@ export class NotificationItem {
   createdAt: string = '';
 }
 
-// ============ 邀请模型 ============
-
+/** 邀请记录 — 用户之间互相邀请回答问题 */
 @Observed
 export class InviteRecord {
   id: string = '';
@@ -44,8 +57,11 @@ export class InviteRecord {
   createdAt: string = '';
 }
 
-// ============ 种子问题数据类型 ============
+// ==================== 种子数据定义 ====================
+// 以下 seed 开头的都是首次启动写入内存的预设数据
+// 包括：话题(20个) → 用户(3个) → 问题(100条) → 邀请(3条)
 
+/** 种子问题的压缩格式 — 减少代码量，运行时展开为完整 QuestionModel */
 interface SeedQuestionData {
   t: string;   // title
   c: string;   // content
@@ -54,10 +70,12 @@ interface SeedQuestionData {
   d: string;   // createdAt
 }
 
-// ============ 数据仓库 ============
+// ==================== 数据仓库单例 ====================
+// DataStore 是全局唯一实例，通过 getInstance() 获取
+// 所有页面共享同一份数据：用户、问题、回答、评论、话题、通知、邀请
 
-export class MockDataStore {
-  private static instance: MockDataStore;
+export class DataStore {
+  private static instance: DataStore;
 
   users: UserModel[] = [];
   questions: QuestionModel[] = [];
@@ -77,12 +95,12 @@ export class MockDataStore {
 
   private dbLoaded: boolean = false;
 
-  static getInstance(): MockDataStore {
-    if (!MockDataStore.instance) {
-      MockDataStore.instance = new MockDataStore();
-      MockDataStore.instance.initSeedData();
+  static getInstance(): DataStore {
+    if (!DataStore.instance) {
+      DataStore.instance = new DataStore();
+      DataStore.instance.initSeedData();
     }
-    return MockDataStore.instance;
+    return DataStore.instance;
   }
 
   genUserId(): string { return `u_${this.nextUserId++}`; }
@@ -97,6 +115,7 @@ export class MockDataStore {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
+  // ---- 初始化所有种子数据（按依赖顺序：话题→用户→问题→邀请）----
   private initSeedData(): void {
     this.seedTopics();
     this.seedUsers();
@@ -104,8 +123,8 @@ export class MockDataStore {
     this.seedInvites();
   }
 
+  /** 种子邀请：预设用户之间互相邀请回答，营造互动氛围 */
   private seedInvites(): void {
-    // 种子邀请数据：种子用户之间互相邀请回答问题
     const inv1: InviteRecord = new InviteRecord();
     inv1.id = this.genInviteId(); inv1.questionId = 'q_1'; inv1.fromUserId = 'u_seed_1';
     inv1.toUserId = 'u_seed_3'; inv1.createdAt = '2026-07-08T10:00:00Z';
@@ -122,7 +141,9 @@ export class MockDataStore {
     this.invites.push(inv3);
   }
 
-  // ========== 种子用户（纯内存，不写 DB）==========
+  // ==================== 种子用户（3个预设账号）====================
+  // App首次启动自动注入内存，不写入后端DB
+  // ID以 u_seed_ 开头区别于真实注册用户
 
   private seedUsers(): void {
     const u1: UserModel = new UserModel();
@@ -156,7 +177,11 @@ export class MockDataStore {
     this.users.push(u3);
   }
 
-  // ========== 种子问题（纯内存，不写 DB）==========
+  // ==================== 种子问题（100条预设问题）====================
+  // 20个话题 × 每话题5条 = 共100条
+  // 这是首页信息流的主要数据来源，App首次启动自动注入内存
+  // 每条格式：{t:标题, c:内容, p:所属话题ID列表, a:作者ID, d:创建时间}
+  // 不写入后端DB，ID以 q_ 开头便于和真实用户发的帖区分
 
   private seedQuestions(): void {
     const data: SeedQuestionData[] = [
@@ -312,7 +337,7 @@ export class MockDataStore {
   }
 
   /**
-   * 从 DB 加载问题和回答到内存 store（App 启动后调用一次）
+   * 从 后端 加载问题和回答到内存 store（App 启动后调用一次）
    */
   async loadFromDb(): Promise<void> {
     if (this.dbLoaded) { return; }
@@ -375,7 +400,7 @@ export class MockDataStore {
 
       this.dbLoaded = true;
     } catch (err) {
-      console.error('MockDataStore.loadFromDb failed:', JSON.stringify(err));
+      console.error('DataStore.loadFromDb failed:', JSON.stringify(err));
     }
   }
 
@@ -469,7 +494,7 @@ export class MockDataStore {
     }
   }
 
-  // ========== Row → Model 转换 ==========
+  // ---------- 数据库行记录 → Model 对象 ----------
 
   private rowToQuestionModel(row: QuestionRow): QuestionModel {
     const q: QuestionModel = new QuestionModel();
@@ -561,7 +586,9 @@ export class MockDataStore {
     return row;
   }
 
-  // ========== 话题种子数据（系统预设，保留）==========
+  // ==================== 种子话题（20个系统预设话题）====================
+  // App首次启动注入，ID从 t_6000 开始，覆盖学业/考研/编程/生活等方向
+  // 话题的 questionCount 由种子问题归属自动累加
 
   private seedTopics(): void {
     this.topics = [];
@@ -600,37 +627,41 @@ export class MockDataStore {
   }
 }
 
-// ============ 辅助类型 ============
+// ==================== 辅助类型 ====================
+// 推荐问题加权排序用的临时结构
 
 class ScoredQuestion {
   question: QuestionModel = new QuestionModel();
   score: number = 0;
 }
 
-// ============ 公开 API ============
+// ==================== 以下为对外暴露的公开 API ====================
+// 所有页面和 ViewModel 通过这些函数读写数据，不直接操作 DataStore 实例
 
-export function getStore(): MockDataStore {
-  return MockDataStore.getInstance();
+/** 获取全局唯一 DataStore 实例 — 所有 API 函数的入口 */
+export function getStore(): DataStore {
+  return DataStore.getInstance();
 }
 
+/** 模拟网络延迟 — 让本地操作有真实 API 的异步感 */
 function delay(ms: number = 300): Promise<void> {
   return new Promise<void>((resolve: Function) => {
     setTimeout(() => { resolve(); }, ms + Math.random() * 200);
   });
 }
 
-// ========== 问题相关 API ==========
+// --- 问题 ---
 
 export async function getQuestions(page: number = 1, pageSize: number = 20): Promise<QuestionModel[]> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const start: number = (page - 1) * pageSize;
   return store.questions.slice(start, start + pageSize);
 }
 
 export async function getQuestionById(id: string): Promise<QuestionModel | undefined> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const result: QuestionModel | undefined = store.questions.find(q => q.id === id);
   if (result) {
     result.viewCount++;
@@ -640,7 +671,7 @@ export async function getQuestionById(id: string): Promise<QuestionModel | undef
 
 export async function getRecommendedQuestions(userId: string, page: number = 1, pageSize: number = 20): Promise<QuestionModel[]> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   // 简单排序：按创建时间倒序（最新），无用户画像时退化为最新列表
   const sorted: QuestionModel[] = [];
   for (const q of store.questions) {
@@ -655,7 +686,7 @@ export async function getRecommendedQuestions(userId: string, page: number = 1, 
 
 export async function getHotQuestions(limit: number = 10): Promise<QuestionModel[]> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const sorted: QuestionModel[] = [];
   for (const q of store.questions) {
     sorted.push(q);
@@ -670,7 +701,7 @@ export async function getHotQuestions(limit: number = 10): Promise<QuestionModel
 
 export async function getQuestionsByTopic(topicId: string, page: number = 1, pageSize: number = 20): Promise<QuestionModel[]> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const filtered: QuestionModel[] = [];
   for (const q of store.questions) {
     if (q.topicIds.includes(topicId)) {
@@ -683,7 +714,7 @@ export async function getQuestionsByTopic(topicId: string, page: number = 1, pag
 
 export async function searchQuestions(keyword: string): Promise<QuestionModel[]> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const kw: string = keyword.toLowerCase();
   const result: QuestionModel[] = [];
   for (const q of store.questions) {
@@ -696,7 +727,7 @@ export async function searchQuestions(keyword: string): Promise<QuestionModel[]>
 
 export async function searchAll(keyword: string): Promise<SearchAllResult> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const kw: string = keyword.toLowerCase();
   const questions: QuestionModel[] = [];
   const topics: TopicModel[] = [];
@@ -730,7 +761,7 @@ export class SearchAllResult {
 }
 
 export async function postQuestion(title: string, content: string, topicIds: string[], authorId: string): Promise<QuestionModel> {
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const author: UserModel | undefined = store.users.find(u => u.id === authorId);
   const authorName: string = author ? author.name : '';
   const authorAvatar: string = author ? author.avatar : '';
@@ -775,7 +806,7 @@ export async function postQuestion(title: string, content: string, topicIds: str
 
 export async function toggleQuestionLike(questionId: string): Promise<QuestionModel | undefined> {
   await delay(100);
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const q: QuestionModel | undefined = store.questions.find(q => q.id === questionId);
   if (q) {
     q.isLiked = !q.isLiked;
@@ -786,7 +817,7 @@ export async function toggleQuestionLike(questionId: string): Promise<QuestionMo
 
 export async function toggleQuestionCollect(questionId: string): Promise<QuestionModel | undefined> {
   await delay(100);
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const q: QuestionModel | undefined = store.questions.find(q => q.id === questionId);
   if (q) {
     q.isCollected = !q.isCollected;
@@ -798,7 +829,7 @@ export async function toggleQuestionCollect(questionId: string): Promise<Questio
 // ========== 删除操作 ==========
 
 export async function deleteQuestion(questionId: string): Promise<boolean> {
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const qIdx: number = store.questions.findIndex(q => q.id === questionId);
   if (qIdx < 0) { return false; }
   const question: QuestionModel = store.questions[qIdx];
@@ -838,7 +869,7 @@ export async function deleteQuestion(questionId: string): Promise<boolean> {
 
 export async function deleteAnswer(answerId: string): Promise<boolean> {
   await delay(100);
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const aIdx: number = store.answers.findIndex(a => a.id === answerId);
   if (aIdx < 0) { return false; }
   const answer: AnswerModel = store.answers[aIdx];
@@ -908,7 +939,7 @@ export async function deleteAnswer(answerId: string): Promise<boolean> {
 
 export async function getAnswersByQuestionId(questionId: string): Promise<AnswerModel[]> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const filtered: AnswerModel[] = [];
   for (const a of store.answers) {
     if (a.questionId === questionId) {
@@ -924,7 +955,7 @@ export async function getAnswersByQuestionId(questionId: string): Promise<Answer
 
 export async function postAnswer(questionId: string, content: string, authorId: string): Promise<AnswerModel> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const author: UserModel | undefined = store.users.find(u => u.id === authorId);
   const answer: AnswerModel = new AnswerModel();
   answer.id = store.genAnswerId();
@@ -1006,7 +1037,7 @@ export async function postAnswer(questionId: string, content: string, authorId: 
 
 export async function acceptAnswer(answerId: string): Promise<AnswerModel | undefined> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const answer: AnswerModel | undefined = store.answers.find(a => a.id === answerId);
   if (answer) {
     answer.isAccepted = true;
@@ -1046,7 +1077,7 @@ export async function acceptAnswer(answerId: string): Promise<AnswerModel | unde
 
 export async function toggleAnswerLike(answerId: string): Promise<AnswerModel | undefined> {
   await delay(100);
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const a: AnswerModel | undefined = store.answers.find(a => a.id === answerId);
   if (a) {
     a.isLiked = !a.isLiked;
@@ -1059,7 +1090,7 @@ export async function toggleAnswerLike(answerId: string): Promise<AnswerModel | 
 
 export async function getCommentsByTargetId(targetId: string): Promise<CommentModel[]> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const filtered: CommentModel[] = [];
   for (const c of store.comments) {
     if (c.targetId === targetId) {
@@ -1074,7 +1105,7 @@ export async function getCommentsByTargetId(targetId: string): Promise<CommentMo
 
 export async function postComment(targetId: string, targetType: CommentTargetType, content: string, authorId: string): Promise<CommentModel> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const author: UserModel | undefined = store.users.find(u => u.id === authorId);
   const comment: CommentModel = new CommentModel();
   comment.id = store.genCommentId();
@@ -1099,7 +1130,7 @@ export async function postComment(targetId: string, targetType: CommentTargetTyp
 
 export async function getAllTopics(): Promise<TopicModel[]> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const result: TopicModel[] = [];
   for (const t of store.topics) {
     result.push(t);
@@ -1109,7 +1140,7 @@ export async function getAllTopics(): Promise<TopicModel[]> {
 
 export async function getFollowedTopics(userId: string): Promise<TopicModel[]> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const user: UserModel | undefined = store.users.find(u => u.id === userId);
   if (!user) {
     return [];
@@ -1125,7 +1156,7 @@ export async function getFollowedTopics(userId: string): Promise<TopicModel[]> {
 
 export async function toggleTopicFollow(topicId: string, userId: string): Promise<TopicModel | undefined> {
   await delay(100);
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const topic: TopicModel | undefined = store.topics.find(t => t.id === topicId);
   const user: UserModel | undefined = store.users.find(u => u.id === userId);
   if (topic && user) {
@@ -1152,7 +1183,7 @@ export async function toggleTopicFollow(topicId: string, userId: string): Promis
 // ========== 用户相关 API ==========
 
 export async function getUserById(id: string): Promise<UserModel | undefined> {
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   // 1. 先查内存 store（种子用户 u_seed_* 也在这里）
   const found: UserModel | undefined = store.users.find(u => u.id === id);
   if (found) { return found; }
@@ -1199,7 +1230,7 @@ export async function getCurrentUser(): Promise<UserModel> {
 
 export async function toggleFollowUser(targetUserId: string, currentUserId: string): Promise<UserModel | undefined> {
   await delay(100);
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const target: UserModel | undefined = store.users.find(u => u.id === targetUserId);
   const current: UserModel | undefined = store.users.find(u => u.id === currentUserId);
   if (!target || !current) { return target; }
@@ -1257,7 +1288,7 @@ export async function toggleFollowUser(targetUserId: string, currentUserId: stri
 
 export async function isFollowingUser(currentUserId: string, targetUserId: string): Promise<boolean> {
   await delay(50);
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const current: UserModel | undefined = store.users.find(u => u.id === currentUserId);
   if (!current) { return false; }
   return current.followedUserIds.includes(targetUserId);
@@ -1265,7 +1296,7 @@ export async function isFollowingUser(currentUserId: string, targetUserId: strin
 
 export async function getFollowingUsers(userId: string): Promise<UserModel[]> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const user: UserModel | undefined = store.users.find(u => u.id === userId);
   if (!user) { return []; }
   const result: UserModel[] = [];
@@ -1278,7 +1309,7 @@ export async function getFollowingUsers(userId: string): Promise<UserModel[]> {
 
 export async function getFollowerUsers(userId: string): Promise<UserModel[]> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const user: UserModel | undefined = store.users.find(u => u.id === userId);
   if (!user) { return []; }
   const result: UserModel[] = [];
@@ -1293,7 +1324,7 @@ export async function getFollowerUsers(userId: string): Promise<UserModel[]> {
 
 export async function getNotifications(userId: string): Promise<NotificationItem[]> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const result: NotificationItem[] = [];
   for (const n of store.notifications) { result.push(n); }
   result.sort((a: NotificationItem, b: NotificationItem) =>
@@ -1304,7 +1335,7 @@ export async function getNotifications(userId: string): Promise<NotificationItem
 
 export async function getUnreadNotificationCount(userId: string): Promise<number> {
   await delay(100);
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   let count: number = 0;
   for (const n of store.notifications) {
     if (!n.isRead) { count++; }
@@ -1314,7 +1345,7 @@ export async function getUnreadNotificationCount(userId: string): Promise<number
 
 export async function markNotificationRead(notificationId: string): Promise<void> {
   await delay(100);
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const noti: NotificationItem | undefined = store.notifications.find(n => n.id === notificationId);
   if (noti) { noti.isRead = true; }
 }
@@ -1323,7 +1354,7 @@ export async function markNotificationRead(notificationId: string): Promise<void
 
 /** 获取发给某用户的待处理邀请数量 */
 export function getPendingInviteCount(userId: string): number {
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   let count = 0;
   for (const inv of store.invites) {
     if (inv.toUserId === userId) { count++; }
@@ -1333,7 +1364,7 @@ export function getPendingInviteCount(userId: string): number {
 
 /** 获取发给某用户的最新 N 条邀请 */
 export function getPendingInvitesForUser(userId: string, limit: number = 3): InviteRecord[] {
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const result: InviteRecord[] = [];
   for (const inv of store.invites) {
     if (inv.toUserId === userId) { result.push(inv); }
@@ -1348,7 +1379,7 @@ export function getPendingInvitesForUser(userId: string, limit: number = 3): Inv
 
 export async function getRelatedQuestions(questionId: string, limit: number = 5): Promise<QuestionModel[]> {
   await delay();
-  const store: MockDataStore = getStore();
+  const store: DataStore = getStore();
   const sourceQ: QuestionModel | undefined = store.questions.find(q => q.id === questionId);
   if (!sourceQ) { return []; }
   const related: ScoredQuestion[] = [];

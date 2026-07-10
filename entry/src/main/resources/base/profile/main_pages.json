@@ -1,10 +1,10 @@
 {
   "src": [
     "pages/home/Index",
-    "pages/login-register/LoginPage",
-    "pages/question/QuestionDetailPage",
-    "pages/discover/SearchPage",
-    "pages/user/UserProfilePage",
-    "pages/FollowListPage"
+    "pages/login-register/denglu",
+    "pages/question/tiezi",
+    "pages/discover/sousuo",
+    "pages/user/tarenzhuye",
+    "pages/user/guanzhufensi"
   ]
 }

@@ -149,13 +149,13 @@ struct UserProfilePage {
                       question: q, showTopicTags: true,
                       onCardClick: () => {
                         router.pushUrl({
-                          url: 'pages/question/QuestionDetailPage',
+                          url: 'pages/question/tiezi',
                           params: { questionId: q.id }
                         });
                       },
                       onAuthorClick: (userId: string) => {
                         AppStorage.setOrCreate('targetUserId', userId);
-                        router.pushUrl({ url: 'pages/user/UserProfilePage' });
+                        router.pushUrl({ url: 'pages/user/tarenzhuye' });
                       }
                     }).margin({ left: 16, right: 16, top: 4, bottom: 4 })
                   }, (q: QuestionModel) => q.id)

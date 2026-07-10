@@ -7,7 +7,7 @@ import { UserModel } from '../../model/UserModel';
 import { QuestionCard } from '../../components/QuestionCard';
 import { SearchBar } from '../../components/SearchBar';
 import { EmptyPlaceholder } from '../../components/EmptyPlaceholder';
-import { searchAll, getQuestionsByTopic } from '../../mock/MockData';
+import { searchAll, getQuestionsByTopic } from '../../store/DataStore';
 import { router } from '@kit.ArkUI';
 
 @Entry
@@ -133,13 +133,13 @@ export struct SearchPage {
                     question: q, showTopicTags: true,
                     onCardClick: () => {
                       router.pushUrl({
-                        url: 'pages/question/QuestionDetailPage',
+                        url: 'pages/question/tiezi',
                         params: { questionId: q.id }
                       });
                     },
                     onAuthorClick: (userId: string) => {
                       AppStorage.setOrCreate('targetUserId', userId);
-                      router.pushUrl({ url: 'pages/user/UserProfilePage' });
+                      router.pushUrl({ url: 'pages/user/tarenzhuye' });
                     }
                   }).margin({ left: 16, right: 16, top: 4, bottom: 4 })
                 }, (q: QuestionModel) => q.id)
@@ -194,7 +194,7 @@ export struct SearchPage {
                   .margin({ left: 16, right: 16, top: 4, bottom: 4 })
                   .onClick(() => {
                     AppStorage.setOrCreate('targetUserId', u.id);
-                    router.pushUrl({ url: 'pages/user/UserProfilePage' });
+                    router.pushUrl({ url: 'pages/user/tarenzhuye' });
                   })
                 }, (u: UserModel) => u.id)
               }

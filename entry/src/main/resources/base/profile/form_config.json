@@ -4,7 +4,7 @@
       "name": "HotQuestionCard",
       "displayName": "热门问题",
       "description": "展示校园问答平台热门问题",
-      "src": "./ets/widgets/pages/HotQuestionCard.ets",
+      "src": "./ets/fuwukapian/HotQuestionCard.ets",
       "window": {
         "designWidth": 720,
         "autoDesignWidth": true

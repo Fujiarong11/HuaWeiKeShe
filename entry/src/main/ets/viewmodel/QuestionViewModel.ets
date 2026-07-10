@@ -15,7 +15,7 @@ import type { AnswerResponse } from '../api/AnswerApi';
 import * as CommentApi from '../api/CommentApi';
 import type { CommentResponse } from '../api/CommentApi';
 import * as InteractionApi from '../api/InteractionApi';
-import { getStore, getUserById } from '../mock/MockData';
+import { getStore, getUserById } from '../store/DataStore';
 
 @Observed
 export class QuestionViewModel {

@@ -4,7 +4,7 @@
  */
 import { QuestionModel } from '../model/QuestionModel';
 import { UserInfoBar } from './UserInfoBar';
-import { getStore } from '../mock/MockData';
+import { getStore } from '../store/DataStore';
 import { router } from '@kit.ArkUI';
 
 @Component
@@ -42,7 +42,7 @@ export struct QuestionCard {
                   .onClick(() => {
                     AppStorage.setOrCreate('searchKeyword', chip.name);
                     router.pushUrl({
-                      url: 'pages/discover/SearchPage',
+                      url: 'pages/discover/sousuo',
                       params: { topicId: chip.id }
                     });
                   })

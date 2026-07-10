@@ -9,7 +9,7 @@ import { BasicDataSource } from '../common/datasource/BasicDataSource';
 import { PAGE_SIZE, HomeTabType } from '../common/constants/CommonConstants';
 import * as QuestionApi from '../api/QuestionApi';
 import type { QuestionResponse } from '../api/QuestionApi';
-import { getStore, getFollowedTopics } from '../mock/MockData';
+import { getStore, getFollowedTopics } from '../store/DataStore';
 
 @Observed
 export class HomeViewModel {

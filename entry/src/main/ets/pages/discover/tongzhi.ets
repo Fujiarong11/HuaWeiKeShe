@@ -2,7 +2,7 @@
  * 通知页面
  * 展示各类系统通知
  */
-import { NotificationItem } from '../../mock/MockData';
+import { NotificationItem } from '../../store/DataStore';
 import * as NotificationApi from '../../api/NotificationApi';
 import type { NotificationResponse } from '../../api/NotificationApi';
 import { EmptyPlaceholder } from '../../components/EmptyPlaceholder';
@@ -130,7 +130,7 @@ export struct NotificationPage {
                   noti.isRead = true;
                   if (noti.targetQuestionId) {
                     router.pushUrl({
-                      url: 'pages/question/QuestionDetailPage',
+                      url: 'pages/question/tiezi',
                       params: { questionId: noti.targetQuestionId }
                     });
                   }

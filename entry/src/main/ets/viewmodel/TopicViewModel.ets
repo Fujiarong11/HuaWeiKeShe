@@ -4,7 +4,7 @@
  */
 import { TopicModel } from '../model/TopicModel';
 import { BasicDataSource } from '../common/datasource/BasicDataSource';
-import { getAllTopics, toggleTopicFollow } from '../mock/MockData';
+import { getAllTopics, toggleTopicFollow } from '../store/DataStore';
 
 @Observed
 export class TopicViewModel {

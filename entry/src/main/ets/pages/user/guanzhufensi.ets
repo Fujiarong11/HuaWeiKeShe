@@ -3,16 +3,16 @@
  * 根据 mode 参数显示"我关注的用户"或"关注我的用户"
  * 数据走后端 API，本地内存仅作降级兜底
  */
-import { UserModel } from '../model/UserModel';
-import * as UserApi from '../api/UserApi';
-import type { UserResponse } from '../api/UserApi';
-import { UserViewModel } from '../viewmodel/UserViewModel';
+import { UserModel } from '../../model/UserModel';
+import * as UserApi from '../../api/UserApi';
+import type { UserResponse } from '../../api/UserApi';
+import { UserViewModel } from '../../viewmodel/UserViewModel';
 import {
   getFollowingUsers,
   getFollowerUsers,
   toggleFollowUser,
   isFollowingUser
-} from '../mock/MockData';
+} from '../../store/DataStore';
 import { router } from '@kit.ArkUI';
 
 @Entry
@@ -210,7 +210,7 @@ export struct FollowListPage {
             .onAction(() => {
               AppStorage.setOrCreate('targetUserId', user.id);
               router.pushUrl({
-                url: 'pages/user/UserProfilePage',
+                url: 'pages/user/tarenzhuye',
                 params: { userId: user.id }
               });
             })
@@ -294,7 +294,7 @@ export struct FollowListPage {
       // 单击跳转到用户主页
       AppStorage.setOrCreate('targetUserId', user.id);
       router.pushUrl({
-        url: 'pages/user/UserProfilePage',
+        url: 'pages/user/tarenzhuye',
         params: { userId: user.id }
       });
     })

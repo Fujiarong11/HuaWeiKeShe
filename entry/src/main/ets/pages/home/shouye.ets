@@ -52,7 +52,7 @@ export struct HomePage {
           .backgroundColor('#F5F5F5').textAlign(TextAlign.Center)
           .onClick(() => {
             AppStorage.setOrCreate('searchKeyword', '');
-            router.pushUrl({ url: 'pages/discover/SearchPage' });
+            router.pushUrl({ url: 'pages/discover/sousuo' });
           })
       }
       .width('100%').padding({ left: 16, right: 16, top: 8, bottom: 4 })
@@ -95,7 +95,7 @@ export struct HomePage {
                 .onClick(() => {
                   AppStorage.setOrCreate('searchKeyword', topic.name);
                   router.pushUrl({
-                    url: 'pages/discover/SearchPage',
+                    url: 'pages/discover/sousuo',
                     params: { topicId: topic.id }
                   });
                 })
@@ -121,13 +121,13 @@ export struct HomePage {
                   showTopicTags: true,
                   onCardClick: () => {
                     router.pushUrl({
-                      url: 'pages/question/QuestionDetailPage',
+                      url: 'pages/question/tiezi',
                       params: { questionId: question.id }
                     });
                   },
                   onAuthorClick: (userId: string) => {
                     AppStorage.setOrCreate('targetUserId', userId);
-                    router.pushUrl({ url: 'pages/user/UserProfilePage' });
+                    router.pushUrl({ url: 'pages/user/tarenzhuye' });
                   }
                 })
                 .margin({ left: 16, right: 16, top: 6, bottom: 6 })
